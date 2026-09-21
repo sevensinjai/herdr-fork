@@ -29,6 +29,7 @@ const CLIENT_SHELL_METHODS: &[&str] = &[
     "pane.link.activate",
     "pane.link.resolve",
     "pane.rename",
+    "pane.report_metadata",
     "pane.resize",
     "pane.scroll",
     "pane.selection.read",
@@ -297,11 +298,20 @@ mod tests {
             actual.remove("pane.link.resolve").as_deref(),
             Some("f5e4a3e01453ae7b188f127ce951c12c20e0bebcc17cc364eeb6d1a01fd5bf81")
         );
+        assert_eq!(
+            actual.remove("pane.report_metadata").as_deref(),
+            Some("c288588cf8ee53e966fa3f060d3b03b7be2654852060d574107e93702e4ba7e7")
+        );
 
         assert_eq!(
             actual, expected,
             "an existing endpoint method changed shape; add load-bearing behavior as a new advertised method or explicitly gate new fields"
         );
+    }
+
+    #[test]
+    fn client_shell_lane_accepts_pane_metadata_reports() {
+        assert!(supports_client_shell_method_name("pane.report_metadata"));
     }
 
     #[test]
