@@ -432,6 +432,33 @@ pub struct AgentsSidebarConfig {
     /// `None` keeps the flat list.
     #[serde(default, deserialize_with = "deserialize_group_by")]
     pub group_by: Option<String>,
+    /// Stage values offered first in the Agents panel menu and used to order
+    /// group headings. Other values in use follow, then "ungrouped".
+    #[serde(default, deserialize_with = "deserialize_group_values")]
+    pub group_values: Vec<String>,
+}
+
+/// Mirrors the server's metadata token value rules (`normalize_metadata_tokens`)
+/// so a configured value round-trips unchanged: trimmed, at most 80 characters,
+/// no control characters. Empty entries and repeats are dropped.
+fn deserialize_group_values<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let mut values: Vec<String> = Vec::new();
+    for raw in Vec::<String>::deserialize(deserializer)? {
+        let value = raw.trim();
+        if value.is_empty() || values.iter().any(|existing| existing == value) {
+            continue;
+        }
+        if value.chars().count() > 80 || value.chars().any(char::is_control) {
+            return Err(serde::de::Error::custom(format!(
+                "invalid ui.sidebar.agents.group_values entry `{value}`: at most 80 characters, no control characters"
+            )));
+        }
+        values.push(value.to_string());
+    }
+    Ok(values)
 }
 
 /// Accepts `$name` and stores the bare token name, matching the custom token
@@ -487,6 +514,7 @@ impl Default for AgentsSidebarConfig {
             rows_by_agent: BTreeMap::new(),
             row_gap: DEFAULT_SIDEBAR_ROW_GAP,
             group_by: None,
+            group_values: Vec::new(),
         }
     }
 }
@@ -759,6 +787,33 @@ rows = [[{ token = "$status", rules = [{ contains = "error", bold = true }] }]]
             assert!(
                 toml::from_str::<crate::config::Config>(&input).is_err(),
                 "accepted key {key:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn group_values_default_to_empty_and_parse_in_order() {
+        let config: crate::config::Config = toml::from_str("").expect("default config");
+        assert!(config.ui.sidebar.agents.group_values.is_empty());
+
+        let config: crate::config::Config = toml::from_str(
+            "[ui.sidebar.agents]\ngroup_by = \"$stage\"\ngroup_values = [\" working \", \"verifying\", \"\", \"working\", \"pending QA\"]\n",
+        )
+        .expect("group_values");
+        assert_eq!(
+            config.ui.sidebar.agents.group_values,
+            vec!["working", "verifying", "pending QA"]
+        );
+    }
+
+    #[test]
+    fn group_values_reject_values_the_server_would_alter() {
+        let long = "x".repeat(81);
+        for value in [long.as_str(), "bad\\u0007bell"] {
+            let input = format!("[ui.sidebar.agents]\ngroup_values = [\"{value}\"]\n");
+            assert!(
+                toml::from_str::<crate::config::Config>(&input).is_err(),
+                "accepted {value:?}"
             );
         }
     }

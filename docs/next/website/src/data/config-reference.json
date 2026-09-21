@@ -1061,6 +1061,12 @@
           "description": "Custom pane metadata token, written as $name, to group the Agents panel by. Agents sharing a value are listed together under a heading with the value and its count; agents without the token are listed last under \"ungrouped\". The aggregate multi-machine list is not grouped. Unset keeps the flat list."
         },
         {
+          "key": "ui.sidebar.agents.group_values",
+          "type": "list of strings",
+          "default": "[]",
+          "description": "Stage values for ui.sidebar.agents.group_by. Listed values come first in the Agents panel heading order and in the right-click stage menu, followed by other values in use. Right-click an agent row to set, add, or clear its stage."
+        },
+        {
           "key": "ui.sidebar.agents.row_gap",
           "type": "integer",
           "default": "0",
