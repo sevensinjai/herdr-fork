@@ -163,6 +163,15 @@ pub(crate) fn keybind_help_groups(
                 entry(binding_label(&keybinds.clear_pane), "clear pane"),
                 entry(binding_label(&keybinds.copy_mode), "copy mode"),
                 entry(binding_label(&keybinds.zoom), "zoom pane"),
+                entry(binding_label(&keybinds.sidecar_toggle), "sidecar"),
+                entry(
+                    binding_label(&keybinds.sidecar_switch_tab),
+                    "sidecar notes/chat",
+                ),
+                entry(
+                    binding_label(&keybinds.sidecar_send_selection),
+                    "send selection to sidecar",
+                ),
                 entry(binding_label(&keybinds.resize_mode), "resize mode"),
                 entry(
                     binding_label(&keybinds.resize_pane_left),
