@@ -525,6 +525,12 @@ fn close_confirmation_error_becomes_client_owned_overlay_and_stable_group_close(
 }
 
 fn stage_menu_state(methods: Vec<String>, group_by: Option<&str>) -> ClientShellState {
+    // "New stage…" writes the config file. Point it at a per-process temp
+    // path (nextest runs each test in its own process) so no test touches a
+    // real herdr or herdr-dev config.
+    let dir = std::env::temp_dir().join(format!("herdr-stage-menu-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("temp config dir");
+    std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, dir.join("config.toml"));
     let mut projected = snapshot();
     projected.agents = vec![ClientShellAgent {
         pane_id: "pane_1".into(),
@@ -683,4 +689,81 @@ fn new_stage_entry_reports_the_typed_value_and_ignores_blank() {
         outcome.actions.is_empty(),
         "blank entry is a no-op, not a clear"
     );
+}
+
+fn save_new_stage(state: &mut ClientShellState, value: &str) -> ClientShellInput {
+    state.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+        title: "new stage (saved)",
+        input: TextEditor::new(value, false),
+        target: ClientRenameTarget::AgentGroup {
+            pane_id: "pane_1".into(),
+            token: "stage".into(),
+        },
+    }));
+    let mut outcome = ClientShellInput::default();
+    state.save_rename_overlay(&mut outcome);
+    outcome
+}
+
+fn endpoint_methods(outcome: &ClientShellInput) -> Vec<&crate::api::schema::Method> {
+    outcome
+        .actions
+        .iter()
+        .filter_map(|action| match action {
+            ClientShellAction::Endpoint { request, .. } => Some(&request.method),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn new_stage_is_saved_to_group_values_and_reloaded() {
+    let dir = std::env::temp_dir().join(format!("herdr-stage-save-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("temp dir");
+    let path = dir.join("config.toml");
+    std::fs::write(
+        &path,
+        "[ui.sidebar.agents]\ngroup_by = \"$stage\"\ngroup_values = [\"working\", \"verifying\"]\n",
+    )
+    .expect("seed config");
+    let mut state = stage_menu_state(
+        vec!["pane.report_metadata".into(), "server.reload_config".into()],
+        Some("stage"),
+    );
+    std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
+    let outcome = save_new_stage(&mut state, " blocked ");
+
+    let methods = endpoint_methods(&outcome);
+    assert!(
+        matches!(
+            methods.as_slice(),
+            [
+                crate::api::schema::Method::PaneReportMetadata(params),
+                crate::api::schema::Method::ServerReloadConfig(_),
+            ] if params.tokens.get("stage") == Some(&Some("blocked".to_string()))
+        ),
+        "methods: {methods:?}"
+    );
+    let saved: Config =
+        toml::from_str(&std::fs::read_to_string(&path).expect("saved config")).expect("parses");
+    assert_eq!(
+        saved.ui.sidebar.agents.group_values,
+        vec!["working", "verifying", "blocked"]
+    );
+    assert_eq!(
+        state.config.agents.group_values,
+        vec!["working", "verifying", "blocked"],
+        "client config reloads so the menu lists the new stage at once"
+    );
+
+    // Typing a value that is already listed only sets the pane.
+    let before = std::fs::read_to_string(&path).expect("config");
+    let outcome = save_new_stage(&mut state, "working");
+    assert!(matches!(
+        endpoint_methods(&outcome).as_slice(),
+        [crate::api::schema::Method::PaneReportMetadata(_)]
+    ));
+    assert_eq!(std::fs::read_to_string(&path).expect("config"), before);
+
+    let _ = std::fs::remove_dir_all(&dir);
 }

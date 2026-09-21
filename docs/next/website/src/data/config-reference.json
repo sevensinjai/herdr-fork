@@ -1064,7 +1064,7 @@
           "key": "ui.sidebar.agents.group_values",
           "type": "list of strings",
           "default": "[]",
-          "description": "Stage values for ui.sidebar.agents.group_by. Listed values come first in the Agents panel heading order and in the right-click stage menu, followed by other values in use. Right-click an agent row to set, add, or clear its stage."
+          "description": "Stage values for ui.sidebar.agents.group_by. Listed values come first in the Agents panel heading order and in the right-click stage menu, followed by other values in use. Right-click an agent row to set, add, or clear its stage; stages added with New stage… are appended here."
         },
         {
           "key": "ui.sidebar.agents.row_gap",

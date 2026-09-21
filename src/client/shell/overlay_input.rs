@@ -984,10 +984,33 @@ impl ClientShellState {
                 super::context_menu::agent_group_method(pane_id, token, Some(trimmed.to_owned()))
             }),
         };
+        let pinned_stage = matches!(
+            &method,
+            Some(crate::api::schema::Method::PaneReportMetadata(_))
+        )
+        .then(|| trimmed.to_owned());
         if let Some(method) = method {
             self.push_endpoint_method(method, outcome);
         }
+        if let Some(value) = pinned_stage {
+            self.pin_agent_group_value(value, outcome);
+        }
         outcome.repaint = true;
+    }
+
+    /// Adds a stage typed in "New stage…" to `ui.sidebar.agents.group_values`
+    /// so it stays in the menu. The pane update above does not depend on this
+    /// succeeding.
+    fn pin_agent_group_value(&mut self, value: String, outcome: &mut ClientShellInput) {
+        if self.config.agents.group_values.contains(&value) {
+            return;
+        }
+        let mut values = self.config.agents.group_values.clone();
+        values.push(value);
+        self.save_settings_edit(
+            crate::config::ConfigEdit::AgentGroupValues(&values),
+            outcome,
+        );
     }
 
     pub(super) fn request_tab_close(&mut self, tab_id: String, outcome: &mut ClientShellInput) {

@@ -348,7 +348,7 @@ impl ClientShellState {
             ClientContextMenuAction::ClearAgentGroup => None,
             ClientContextMenuAction::NewAgentGroup => {
                 self.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
-                    title: "set stage",
+                    title: "new stage (saved)",
                     input: TextEditor::new("", true),
                     target: ClientRenameTarget::AgentGroup { pane_id, token },
                 }));

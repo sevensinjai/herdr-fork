@@ -467,7 +467,8 @@ group_values = ["working", "verifying", "pending QA"]
 Listed values come first, in the order given, followed by any other values in
 use, then `ungrouped`. A listed value with no agents shows no heading.
 Right-click an agent row to pick a stage, type a new one with `New stage…`, or
-remove it with `Clear stage`. The menu needs `group_by` set and a server that
+remove it with `Clear stage`. A stage typed in `New stage…` is also appended to
+`group_values` in your config file, so it stays in the menu. The menu needs `group_by` set and a server that
 accepts pane metadata reports from the client.
 
 `row_gap` controls the blank terminal rows between entries, independently for the Agent and Space panels. It defaults to `0`, which packs entries together; set it to `1` to restore the previous spacing. It does not add spacing between the content lines declared in `rows`. Consecutive indented worktree children remain packed as one Space group.
