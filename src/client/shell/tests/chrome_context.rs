@@ -641,3 +641,46 @@ fn agent_row_menu_needs_group_by_and_an_advertised_method() {
     right_click_first_agent(&mut state);
     assert!(state.overlay.is_none(), "grouping off: no menu");
 }
+
+#[test]
+fn new_stage_entry_reports_the_typed_value_and_ignores_blank() {
+    let mut state = stage_menu_state(vec!["pane.report_metadata".into()], Some("stage"));
+    right_click_first_agent(&mut state);
+    click_menu_row(&mut state, 3);
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+            target: ClientRenameTarget::AgentGroup { ref pane_id, ref token },
+            ..
+        })) if pane_id == "pane_1" && token == "stage"
+    ));
+
+    if let Some(ClientShellOverlay::Rename(rename)) = state.overlay.as_mut() {
+        rename.input = TextEditor::new("  blocked on API  ", false);
+    }
+    let mut outcome = ClientShellInput::default();
+    state.save_rename_overlay(&mut outcome);
+    assert_eq!(
+        reported_stage(&outcome),
+        (
+            "pane_1".to_string(),
+            "herdr-ui".to_string(),
+            Some("blocked on API".to_string())
+        )
+    );
+
+    state.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+        title: "set stage",
+        input: TextEditor::new("   ", false),
+        target: ClientRenameTarget::AgentGroup {
+            pane_id: "pane_1".into(),
+            token: "stage".into(),
+        },
+    }));
+    let mut outcome = ClientShellInput::default();
+    state.save_rename_overlay(&mut outcome);
+    assert!(
+        outcome.actions.is_empty(),
+        "blank entry is a no-op, not a clear"
+    );
+}

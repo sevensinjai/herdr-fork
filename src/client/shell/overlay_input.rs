@@ -980,8 +980,9 @@ impl ClientShellState {
                     label: Some(trimmed.to_owned()),
                 },
             )),
-            // Filled in by the "New stage…" task.
-            ClientRenameTarget::AgentGroup { .. } => None,
+            ClientRenameTarget::AgentGroup { pane_id, token } => (!trimmed.is_empty()).then(|| {
+                super::context_menu::agent_group_method(pane_id, token, Some(trimmed.to_owned()))
+            }),
         };
         if let Some(method) = method {
             self.push_endpoint_method(method, outcome);
