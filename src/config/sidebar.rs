@@ -427,6 +427,41 @@ pub struct AgentsSidebarConfig {
     #[serde(default, deserialize_with = "deserialize_rows_by_agent")]
     pub rows_by_agent: BTreeMap<String, AgentSidebarRows>,
     pub row_gap: u16,
+    /// Custom pane metadata token to group the Agents panel by, written as
+    /// `$name`. Agents sharing a value are listed together under a heading.
+    /// `None` keeps the flat list.
+    #[serde(default, deserialize_with = "deserialize_group_by")]
+    pub group_by: Option<String>,
+}
+
+/// Accepts `$name` and stores the bare token name, matching the custom token
+/// rules already used by sidebar rows.
+fn deserialize_group_by<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let Some(value) = Option::<String>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let Some(name) = value.strip_prefix('$') else {
+        return Err(serde::de::Error::custom(format!(
+            "ui.sidebar.agents.group_by `{value}` must name a custom token starting with `$`"
+        )));
+    };
+    if name.is_empty()
+        || name.len() > 32
+        || !name
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
+    {
+        return Err(serde::de::Error::custom(format!(
+            "invalid ui.sidebar.agents.group_by token `{value}`"
+        )));
+    }
+    Ok(Some(name.to_string()))
 }
 
 impl AgentsSidebarConfig {
@@ -451,6 +486,7 @@ impl Default for AgentsSidebarConfig {
             ],
             rows_by_agent: BTreeMap::new(),
             row_gap: DEFAULT_SIDEBAR_ROW_GAP,
+            group_by: None,
         }
     }
 }

@@ -423,6 +423,38 @@ The first matching rule wins. Its specified style fields override the occurrence
 
 Rules work with text-valued built-ins and custom `$name` tokens in Agent rows, `rows_by_agent` overrides, and Space rows. Custom tokens match their reported value: `$load` reporting `"90"` selects red and bold above, `"60"` selects yellow, and `"90%"` keeps white. Unreported tokens still disappear. `state_icon` and composite `git_status` accept fixed styles only, not rules. Unknown conditions and malformed rules are rejected when loading config; regex, fuzzy matching, and scripts are not supported.
 
+### Group the Agents panel
+
+Set `group_by` to a custom pane metadata token to list agents under headings
+instead of in one flat list:
+
+```toml
+[ui.sidebar.agents]
+group_by = "$stage"
+```
+
+Agents reporting the same value for that token are listed together under a
+heading showing the value and how many agents it holds. Groups appear in the
+order they are first encountered, and agents keep their order inside a group,
+so the active sort still decides the ordering. Agents that have not reported
+the token collect under a final `ungrouped` heading.
+
+The token is a custom `$name` value reported by a plugin or script, the same
+kind used in `rows`:
+
+```bash
+herdr pane report-metadata <pane_id> --source my-tool --token stage="waiting QA"
+```
+
+Grouping reorders the Agents panel itself, so Agent navigation and indexed
+focus follow what you see: with `group_by` set, `focus_agent` numbering and
+next/previous Agent walk the grouped order. Headings are labels only. They are
+not selectable and take no mouse clicks. Omit `group_by`, or set it to an empty
+string, to keep the flat list.
+
+Grouping applies to a single server's Agents panel. The combined list shown
+when several saved machines are connected keeps its own ordering.
+
 `row_gap` controls the blank terminal rows between entries, independently for the Agent and Space panels. It defaults to `0`, which packs entries together; set it to `1` to restore the previous spacing. It does not add spacing between the content lines declared in `rows`. Consecutive indented worktree children remain packed as one Space group.
 
 Override the complete Agent layout for a known agent under `rows_by_agent`:
