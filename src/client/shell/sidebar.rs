@@ -130,7 +130,7 @@ pub(crate) fn render_collapsed_sidebar(
     for (index, pane_id) in super::ordered_agent_pane_ids(
         snapshot,
         config.agent_panel_sort,
-        config.agents.group_by.as_deref(),
+        super::agent_sidebar::AgentGrouping::from_config(&config.agents),
     )
     .into_iter()
     .take(detail_content.height as usize)

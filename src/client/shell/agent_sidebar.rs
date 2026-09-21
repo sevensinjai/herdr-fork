@@ -53,9 +53,37 @@ pub(super) fn group_agent_rows(rows: Vec<AgentRow>, ungrouped_label: &str) -> Ve
     entries
 }
 
-/// Stable-partition pane ids by the value of `group_by`, preserving the
-/// incoming order of both the groups and the agents inside them. Agents
-/// missing the token move to the end.
+/// Grouping settings from `ui.sidebar.agents`: the token to group by and the
+/// configured value order.
+#[derive(Clone, Copy)]
+pub(super) struct AgentGrouping<'a> {
+    pub(super) token: &'a str,
+    pub(super) order: &'a [String],
+}
+
+impl<'a> AgentGrouping<'a> {
+    pub(super) fn from_config(config: &'a crate::config::AgentsSidebarConfig) -> Option<Self> {
+        config.group_by.as_deref().map(|token| Self {
+            token,
+            order: &config.group_values,
+        })
+    }
+}
+
+fn agent_group_value<'s>(
+    agent: &'s crate::protocol::ClientShellAgent,
+    token: &str,
+) -> Option<&'s str> {
+    agent
+        .tokens
+        .iter()
+        .find(|(name, _)| name.as_str() == token)
+        .map(|(_, value)| value.as_str())
+}
+
+/// Stable-partition pane ids by group value. Configured values come first in
+/// config order, then other values by first appearance, then agents without
+/// the token. Agents keep their incoming order inside each group.
 ///
 /// Grouping is applied to the canonical order rather than at render time, so
 /// the sidebar, Agent navigation, and indexed focus all agree on what "the
@@ -63,26 +91,29 @@ pub(super) fn group_agent_rows(rows: Vec<AgentRow>, ungrouped_label: &str) -> Ve
 fn apply_grouping(
     snapshot: &ClientShellSnapshot,
     pane_ids: Vec<String>,
-    group_by: Option<&str>,
+    grouping: Option<AgentGrouping<'_>>,
 ) -> Vec<String> {
-    let Some(token) = group_by else {
+    let Some(grouping) = grouping else {
         return pane_ids;
     };
-    let mut order: Vec<Option<String>> = Vec::new();
-    let mut buckets: Vec<Vec<String>> = Vec::new();
+    // One pass over the agents instead of a lookup per pane: this runs on
+    // every Agents panel render.
+    let values: HashMap<&str, &str> = snapshot
+        .agents
+        .iter()
+        .filter_map(|agent| {
+            agent_group_value(agent, grouping.token).map(|value| (agent.pane_id.as_str(), value))
+        })
+        .collect();
+    let mut order: Vec<Option<&str>> = grouping
+        .order
+        .iter()
+        .map(|value| Some(value.as_str()))
+        .collect();
+    let mut buckets: Vec<Vec<String>> = vec![Vec::new(); order.len()];
     for pane_id in pane_ids {
-        let key = snapshot
-            .agents
-            .iter()
-            .find(|agent| agent.pane_id == pane_id)
-            .and_then(|agent| {
-                agent
-                    .tokens
-                    .iter()
-                    .find(|(name, _)| name.as_str() == token)
-                    .map(|(_, value)| value.clone())
-            });
-        match order.iter().position(|candidate| candidate == &key) {
+        let key = values.get(pane_id.as_str()).copied();
+        match order.iter().position(|candidate| *candidate == key) {
             Some(index) => buckets[index].push(pane_id),
             None => {
                 order.push(key);
@@ -91,17 +122,36 @@ fn apply_grouping(
         }
     }
     if let Some(index) = order.iter().position(Option::is_none) {
-        order.remove(index);
         let bucket = buckets.remove(index);
         buckets.push(bucket);
     }
     buckets.into_iter().flatten().collect()
 }
 
+/// Stage choices for the agent context menu: configured values first, then
+/// every other value an agent currently reports, each once.
+pub(super) fn agent_group_choices(
+    snapshot: &ClientShellSnapshot,
+    token: &str,
+    configured: &[String],
+) -> Vec<String> {
+    let mut choices = configured.to_vec();
+    for value in snapshot
+        .agents
+        .iter()
+        .filter_map(|agent| agent_group_value(agent, token))
+    {
+        if !choices.iter().any(|choice| choice == value) {
+            choices.push(value.to_string());
+        }
+    }
+    choices
+}
+
 pub(super) fn ordered_agent_pane_ids(
     snapshot: &ClientShellSnapshot,
     sort: crate::config::AgentPanelSortConfig,
-    group_by: Option<&str>,
+    grouping: Option<AgentGrouping<'_>>,
 ) -> Vec<String> {
     if snapshot.agent_view_label.is_some() {
         let ordered = snapshot
@@ -115,7 +165,7 @@ pub(super) fn ordered_agent_pane_ids(
             })
             .cloned()
             .collect();
-        return apply_grouping(snapshot, ordered, group_by);
+        return apply_grouping(snapshot, ordered, grouping);
     }
     let mut agents = snapshot.agents.iter().collect::<Vec<_>>();
     if sort == crate::config::AgentPanelSortConfig::Priority {
@@ -130,7 +180,7 @@ pub(super) fn ordered_agent_pane_ids(
         .into_iter()
         .map(|agent| agent.pane_id.clone())
         .collect();
-    apply_grouping(snapshot, ordered, group_by)
+    apply_grouping(snapshot, ordered, grouping)
 }
 
 pub(super) fn render_agent_panel(
@@ -429,7 +479,7 @@ pub(super) fn agent_rows(
     ordered_agent_pane_ids(
         snapshot,
         config.agent_panel_sort,
-        config.agents.group_by.as_deref(),
+        AgentGrouping::from_config(&config.agents),
     )
     .into_iter()
     .filter_map(|pane_id| agent_row(snapshot, &pane_id, config, machine))
@@ -605,6 +655,83 @@ mod group_tests {
             rows: Vec::new(),
             group: group.map(str::to_string),
         }
+    }
+
+    fn snapshot_with(stages: &[(&str, Option<&str>)]) -> ClientShellSnapshot {
+        let mut snapshot = super::super::tests::snapshot();
+        snapshot.agents = stages
+            .iter()
+            .map(|(pane_id, stage)| crate::protocol::ClientShellAgent {
+                pane_id: (*pane_id).to_string(),
+                workspace_id: "ws_1".into(),
+                tab_id: "tab_1".into(),
+                name: None,
+                display_agent: None,
+                agent: Some("claude".into()),
+                title: None,
+                terminal_title: None,
+                terminal_title_stripped: None,
+                agent_status: AgentStatus::Idle,
+                state_change_seq: 0,
+                state_labels: Vec::new(),
+                tokens: stage
+                    .map(|value| vec![("stage".to_string(), value.to_string())])
+                    .unwrap_or_default(),
+                focused: false,
+            })
+            .collect();
+        snapshot
+    }
+
+    fn ids(ids: &[&str]) -> Vec<String> {
+        ids.iter().map(|id| (*id).to_string()).collect()
+    }
+
+    #[test]
+    fn configured_values_lead_then_unlisted_by_appearance_then_ungrouped() {
+        let snapshot = snapshot_with(&[
+            ("p1", Some("hotfix")),
+            ("p2", None),
+            ("p3", Some("verifying")),
+            ("p4", Some("working")),
+            ("p5", Some("hotfix")),
+        ]);
+        let order = ids(&["working", "verifying", "pending QA"]);
+        let grouping = AgentGrouping {
+            token: "stage",
+            order: &order,
+        };
+        assert_eq!(
+            apply_grouping(
+                &snapshot,
+                ids(&["p1", "p2", "p3", "p4", "p5"]),
+                Some(grouping)
+            ),
+            ids(&["p4", "p3", "p1", "p5", "p2"])
+        );
+    }
+
+    #[test]
+    fn no_grouping_keeps_incoming_order() {
+        let snapshot = snapshot_with(&[("p1", Some("b")), ("p2", Some("a"))]);
+        assert_eq!(
+            apply_grouping(&snapshot, ids(&["p1", "p2"]), None),
+            ids(&["p1", "p2"])
+        );
+    }
+
+    #[test]
+    fn choices_list_configured_then_in_use_values_once() {
+        let snapshot = snapshot_with(&[
+            ("p1", Some("hotfix")),
+            ("p2", Some("working")),
+            ("p3", Some("hotfix")),
+        ]);
+        let configured = ids(&["working", "verifying"]);
+        assert_eq!(
+            agent_group_choices(&snapshot, "stage", &configured),
+            ids(&["working", "verifying", "hotfix"])
+        );
     }
 
     fn shape(entries: &[AgentListEntry]) -> Vec<String> {
