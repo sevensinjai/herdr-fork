@@ -315,6 +315,10 @@ pub(super) enum ClientRenameTarget {
     Pane {
         pane_id: String,
     },
+    AgentGroup {
+        pane_id: String,
+        token: String,
+    },
 }
 
 #[derive(Debug)]
@@ -525,6 +529,10 @@ pub(super) enum ClientContextMenuAction {
     Zoom,
     ToggleRightClickPassthrough,
     ClosePane,
+    /// Index into `ClientContextMenuTarget::Agent::choices`.
+    SetAgentGroup(usize),
+    NewAgentGroup,
+    ClearAgentGroup,
 }
 
 #[derive(Debug)]
@@ -547,6 +555,13 @@ pub(super) enum ClientContextMenuTarget {
         has_manual_label: bool,
         right_click_passthrough: bool,
     },
+    Agent {
+        pane_id: String,
+        /// The `ui.sidebar.agents.group_by` token name.
+        token: String,
+        choices: Vec<String>,
+        current: Option<String>,
+    },
 }
 
 #[derive(Debug)]
@@ -558,7 +573,7 @@ pub(super) struct ClientContextMenuOverlay {
 }
 
 pub(super) struct ClientContextMenuItem {
-    pub(super) label: &'static str,
+    pub(super) label: std::borrow::Cow<'static, str>,
     pub(super) action: ClientContextMenuAction,
 }
 

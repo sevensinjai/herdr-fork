@@ -523,3 +523,121 @@ fn close_confirmation_error_becomes_client_owned_overlay_and_stable_group_close(
             if params.workspace_id == "ws_1" && params.close_group
     ));
 }
+
+fn stage_menu_state(methods: Vec<String>, group_by: Option<&str>) -> ClientShellState {
+    let mut projected = snapshot();
+    projected.agents = vec![ClientShellAgent {
+        pane_id: "pane_1".into(),
+        workspace_id: "ws_1".into(),
+        tab_id: "tab_1".into(),
+        name: Some("claude".into()),
+        display_agent: None,
+        agent: Some("claude".into()),
+        title: None,
+        terminal_title: None,
+        terminal_title_stripped: None,
+        agent_status: AgentStatus::Idle,
+        state_change_seq: 1,
+        state_labels: Vec::new(),
+        tokens: vec![("stage".into(), "hotfix".into())],
+        focused: true,
+    }];
+    let mut config = Config::default();
+    config.ui.sidebar.agents.group_by = group_by.map(str::to_string);
+    config.ui.sidebar.agents.group_values = vec!["working".into(), "verifying".into()];
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&config));
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+    state.set_endpoint_methods(Some(methods));
+    state.compose(106, 30).expect("composed frame");
+    state
+}
+
+fn right_click_first_agent(state: &mut ClientShellState) {
+    let row = state.hits.agents.first().expect("agent row hit").0;
+    state.handle_raw_events(vec![RawInputEvent::Mouse(crossterm::event::MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: row.x + 1,
+        row: row.y,
+        modifiers: KeyModifiers::empty(),
+    })]);
+}
+
+fn click_menu_row(state: &mut ClientShellState, index: usize) -> ClientShellInput {
+    state.compose(106, 30).expect("menu frame");
+    let row = state.hits.context_menu_rows[index].0;
+    state.handle_raw_events(vec![RawInputEvent::Mouse(crossterm::event::MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: row.x + 1,
+        row: row.y,
+        modifiers: KeyModifiers::empty(),
+    })])
+}
+
+fn reported_stage(outcome: &ClientShellInput) -> (String, String, Option<String>) {
+    let [ClientShellAction::Endpoint { request, .. }] = &outcome.actions[..] else {
+        panic!("stage change should use the endpoint API");
+    };
+    let crate::api::schema::Method::PaneReportMetadata(params) = &request.method else {
+        panic!("stage change should report pane metadata");
+    };
+    assert_eq!(params.tokens.len(), 1);
+    (
+        params.pane_id.clone(),
+        params.source.clone(),
+        params.tokens.get("stage").cloned().expect("stage token"),
+    )
+}
+
+#[test]
+fn agent_row_menu_lists_stages_and_reports_metadata() {
+    let mut state = stage_menu_state(vec!["pane.report_metadata".into()], Some("stage"));
+    right_click_first_agent(&mut state);
+    let labels: Vec<String> = match state.overlay.as_ref() {
+        Some(ClientShellOverlay::ContextMenu(menu)) => menu
+            .items()
+            .iter()
+            .map(|item| item.label.to_string())
+            .collect(),
+        _ => panic!("agent context menu"),
+    };
+    assert_eq!(
+        labels,
+        vec![
+            "  working",
+            "  verifying",
+            "✓ hotfix",
+            "  New stage…",
+            "  Clear stage"
+        ]
+    );
+
+    let outcome = click_menu_row(&mut state, 1);
+    assert_eq!(
+        reported_stage(&outcome),
+        (
+            "pane_1".to_string(),
+            "herdr-ui".to_string(),
+            Some("verifying".to_string())
+        )
+    );
+}
+
+#[test]
+fn agent_row_menu_clear_sends_a_token_clear() {
+    let mut state = stage_menu_state(vec!["pane.report_metadata".into()], Some("stage"));
+    right_click_first_agent(&mut state);
+    let outcome = click_menu_row(&mut state, 4);
+    assert_eq!(reported_stage(&outcome).2, None);
+}
+
+#[test]
+fn agent_row_menu_needs_group_by_and_an_advertised_method() {
+    let mut state = stage_menu_state(Vec::new(), Some("stage"));
+    right_click_first_agent(&mut state);
+    assert!(state.overlay.is_none(), "older server: no menu");
+
+    let mut state = stage_menu_state(vec!["pane.report_metadata".into()], None);
+    right_click_first_agent(&mut state);
+    assert!(state.overlay.is_none(), "grouping off: no menu");
+}

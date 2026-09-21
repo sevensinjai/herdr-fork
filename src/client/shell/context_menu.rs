@@ -1,10 +1,39 @@
 use super::*;
 
+/// Metadata source the TUI reports stage changes under.
+const AGENT_GROUP_SOURCE: &str = "herdr-ui";
+
+/// Set (`Some`) or clear (`None`) one pane's group token.
+pub(super) fn agent_group_method(
+    pane_id: String,
+    token: String,
+    value: Option<String>,
+) -> crate::api::schema::Method {
+    crate::api::schema::Method::PaneReportMetadata(crate::api::schema::PaneReportMetadataParams {
+        pane_id,
+        source: AGENT_GROUP_SOURCE.to_string(),
+        agent: None,
+        applies_to_source: None,
+        title: None,
+        display_agent: None,
+        state_labels: std::collections::HashMap::new(),
+        tokens: std::collections::HashMap::from([(token, value)]),
+        clear_title: false,
+        clear_display_agent: false,
+        clear_state_labels: false,
+        seq: None,
+        ttl_ms: None,
+    })
+}
+
 impl ClientContextMenuOverlay {
     pub(super) fn items(&self) -> Vec<ClientContextMenuItem> {
         use ClientContextMenuAction as Action;
 
-        let item = |label, action| ClientContextMenuItem { label, action };
+        let item = |label: &'static str, action| ClientContextMenuItem {
+            label: label.into(),
+            action,
+        };
         match &self.target {
             ClientContextMenuTarget::Workspace { is_git: false, .. } => {
                 vec![item("Rename", Action::Rename), item("Close", Action::Close)]
@@ -73,6 +102,30 @@ impl ClientContextMenuOverlay {
                     ),
                     item("Close pane", Action::ClosePane),
                 ]);
+                items
+            }
+            ClientContextMenuTarget::Agent {
+                choices, current, ..
+            } => {
+                let mut items: Vec<ClientContextMenuItem> = choices
+                    .iter()
+                    .enumerate()
+                    .map(|(index, value)| {
+                        let mark = if current.as_deref() == Some(value.as_str()) {
+                            '✓'
+                        } else {
+                            ' '
+                        };
+                        ClientContextMenuItem {
+                            label: format!("{mark} {value}").into(),
+                            action: Action::SetAgentGroup(index),
+                        }
+                    })
+                    .collect();
+                items.push(item("  New stage…", Action::NewAgentGroup));
+                if current.is_some() {
+                    items.push(item("  Clear stage", Action::ClearAgentGroup));
+                }
                 items
             }
         }
@@ -167,6 +220,60 @@ impl ClientShellState {
         }));
     }
 
+    fn active_endpoint_advertises(&self, method: &str) -> bool {
+        self.endpoint_is_online(&self.active_endpoint_id)
+            && self
+                .endpoints
+                .iter()
+                .find(|endpoint| endpoint.endpoint_id == self.active_endpoint_id)
+                .and_then(|endpoint| endpoint.methods.as_ref())
+                .is_some_and(|methods| methods.iter().any(|candidate| candidate == method))
+    }
+
+    /// Opens the stage menu for an agent row. Returns false, and leaves the
+    /// overlay unchanged, when grouping is off or the server cannot accept
+    /// metadata reports from this client.
+    pub(super) fn open_agent_context_menu(&mut self, pane_id: String, x: u16, y: u16) -> bool {
+        let Some(token) = self.config.agents.group_by.clone() else {
+            return false;
+        };
+        if !self.active_endpoint_advertises("pane.report_metadata") {
+            return false;
+        }
+        let Some(snapshot) = self.snapshot.as_deref() else {
+            return false;
+        };
+        let Some(agent) = snapshot
+            .agents
+            .iter()
+            .find(|agent| agent.pane_id == pane_id)
+        else {
+            return false;
+        };
+        let current = agent
+            .tokens
+            .iter()
+            .find(|(name, _)| *name == token)
+            .map(|(_, value)| value.clone());
+        let choices = super::agent_sidebar::agent_group_choices(
+            snapshot,
+            &token,
+            &self.config.agents.group_values,
+        );
+        self.overlay = Some(ClientShellOverlay::ContextMenu(ClientContextMenuOverlay {
+            target: ClientContextMenuTarget::Agent {
+                pane_id,
+                token,
+                choices,
+                current,
+            },
+            x,
+            y,
+            highlighted: 0,
+        }));
+        true
+    }
+
     pub(super) fn move_context_menu_selection(&mut self, delta: isize) {
         let Some(ClientShellOverlay::ContextMenu(menu)) = self.overlay.as_mut() else {
             return;
@@ -213,8 +320,43 @@ impl ClientShellState {
                 action,
                 outcome,
             ),
+            ClientContextMenuTarget::Agent {
+                pane_id,
+                token,
+                choices,
+                ..
+            } => self.activate_agent_context_action(pane_id, token, choices, action, outcome),
         }
         outcome.repaint = true;
+    }
+
+    fn activate_agent_context_action(
+        &mut self,
+        pane_id: String,
+        token: String,
+        choices: Vec<String>,
+        action: ClientContextMenuAction,
+        outcome: &mut ClientShellInput,
+    ) {
+        let value = match action {
+            ClientContextMenuAction::SetAgentGroup(index) => {
+                let Some(value) = choices.into_iter().nth(index) else {
+                    return;
+                };
+                Some(value)
+            }
+            ClientContextMenuAction::ClearAgentGroup => None,
+            ClientContextMenuAction::NewAgentGroup => {
+                self.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+                    title: "set stage",
+                    input: TextEditor::new("", true),
+                    target: ClientRenameTarget::AgentGroup { pane_id, token },
+                }));
+                return;
+            }
+            _ => return,
+        };
+        self.push_endpoint_method(agent_group_method(pane_id, token, value), outcome);
     }
 
     fn activate_workspace_context_action(

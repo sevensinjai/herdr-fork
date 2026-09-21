@@ -980,6 +980,8 @@ impl ClientShellState {
                     label: Some(trimmed.to_owned()),
                 },
             )),
+            // Filled in by the "New stage…" task.
+            ClientRenameTarget::AgentGroup { .. } => None,
         };
         if let Some(method) = method {
             self.push_endpoint_method(method, outcome);
