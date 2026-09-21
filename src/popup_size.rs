@@ -47,6 +47,28 @@ pub(crate) struct PopupResolvedGeometry {
     pub inner: Rect,
 }
 
+/// Minimum Sidecar width in cells.
+pub(crate) const SIDECAR_MIN_COLS: u16 = 30;
+/// Cells of pane area the Sidecar always leaves uncovered.
+pub(crate) const SIDECAR_KEEP_VISIBLE_COLS: u16 = 10;
+
+/// Geometry for the right-docked Sidecar: full height of `area`, a left border
+/// column and a header row, the terminal in the rest. `None` when the area is
+/// too small to fit the minimum width next to the uncovered margin.
+pub(crate) fn resolve_right_docked_geometry(
+    width: PopupSize,
+    area: Rect,
+) -> Option<PopupResolvedGeometry> {
+    let max = area.width.checked_sub(SIDECAR_KEEP_VISIBLE_COLS)?;
+    if max < SIDECAR_MIN_COLS || area.height < 3 {
+        return None;
+    }
+    let outer_width = width.resolve(area.width).clamp(SIDECAR_MIN_COLS, max);
+    let outer = Rect::new(area.right() - outer_width, area.y, outer_width, area.height);
+    let inner = Rect::new(outer.x + 1, outer.y + 1, outer.width - 1, outer.height - 1);
+    Some(PopupResolvedGeometry { outer, inner })
+}
+
 pub(crate) fn resolve_popup_geometry(
     width: Option<PopupSize>,
     height: Option<PopupSize>,
