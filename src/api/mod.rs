@@ -78,6 +78,8 @@ pub(crate) fn request_changes_ui(request: &Request) -> bool {
             | Method::PaneReleaseAgent(_)
             | Method::PaneClose(_)
             | Method::PopupClose(_)
+            | Method::SidecarShow(_)
+            | Method::SidecarSend(_)
             | Method::PluginUnlink(_)
             | Method::PluginDisable(_)
             | Method::PluginActionInvoke(_)

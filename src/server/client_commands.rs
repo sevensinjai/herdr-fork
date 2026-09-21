@@ -38,6 +38,8 @@ const CLIENT_SHELL_METHODS: &[&str] = &[
     "product_announcement.dismiss",
     "release_notes.dismiss",
     "server.reload_config",
+    "sidecar.send",
+    "sidecar.show",
     "tab.close",
     "tab.create",
     "tab.focus",
@@ -297,11 +299,25 @@ mod tests {
             actual.remove("pane.link.resolve").as_deref(),
             Some("f5e4a3e01453ae7b188f127ce951c12c20e0bebcc17cc364eeb6d1a01fd5bf81")
         );
+        assert_eq!(
+            actual.remove("sidecar.show").as_deref(),
+            Some("d760b16a97b800c690fb53119002eed7e93b209992bc613f8d5231fa05833b59")
+        );
+        assert_eq!(
+            actual.remove("sidecar.send").as_deref(),
+            Some("6210d1559860c7162ff87954471e765b3d745eca6ce0879426d4f372f2c43232")
+        );
 
         assert_eq!(
             actual, expected,
             "an existing endpoint method changed shape; add load-bearing behavior as a new advertised method or explicitly gate new fields"
         );
+    }
+
+    #[test]
+    fn client_shell_lane_accepts_sidecar_methods() {
+        assert!(supports_client_shell_method_name("sidecar.show"));
+        assert!(supports_client_shell_method_name("sidecar.send"));
     }
 
     #[test]

@@ -1178,6 +1178,23 @@ impl App {
                 return self.handle_pane_send_input(request.id, params);
             }
             Method::PaneClose(target) => return self.handle_pane_close(request.id, target),
+            Method::SidecarShow(params) => {
+                return match self.sidecar_show(params.tab) {
+                    Ok(terminal_id) => responses::encode_success(
+                        request.id,
+                        ResponseResult::SidecarShown {
+                            terminal_id: terminal_id.to_string(),
+                        },
+                    ),
+                    Err(error) => sidecar_error(request.id, &error),
+                };
+            }
+            Method::SidecarSend(params) => {
+                return match self.sidecar_send(params.tab, params.text) {
+                    Ok(()) => responses::encode_success(request.id, ResponseResult::Ok {}),
+                    Err(error) => sidecar_error(request.id, &error),
+                };
+            }
             Method::PopupClose(_) => {
                 return if self.close_popup_pane() {
                     responses::encode_success(request.id, ResponseResult::Ok {})
@@ -2465,4 +2482,13 @@ mod tests {
             Some("__herdr_original__ · 1")
         );
     }
+}
+
+fn sidecar_error(id: String, error: &std::io::Error) -> String {
+    let code = if error.kind() == std::io::ErrorKind::InvalidInput {
+        "invalid_request"
+    } else {
+        "sidecar_failed"
+    };
+    responses::encode_error(id, code, error.to_string())
 }

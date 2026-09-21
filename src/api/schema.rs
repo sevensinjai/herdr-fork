@@ -236,6 +236,10 @@ pub enum Method {
     PaneClose(PaneTarget),
     #[serde(rename = "popup.close")]
     PopupClose(EmptyParams),
+    #[serde(rename = "sidecar.show")]
+    SidecarShow(SidecarShowParams),
+    #[serde(rename = "sidecar.send")]
+    SidecarSend(SidecarSendParams),
     #[serde(rename = "events.subscribe")]
     EventsSubscribe(EventsSubscribeParams),
     #[serde(rename = "events.wait")]

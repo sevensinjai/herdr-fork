@@ -304,6 +304,10 @@ pub enum ResponseResult {
         active: bool,
         projection_revision: u64,
     },
+    /// `sidecar.show`: the tab's running terminal.
+    SidecarShown {
+        terminal_id: String,
+    },
     Ok {},
 }
 

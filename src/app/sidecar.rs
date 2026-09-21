@@ -362,6 +362,43 @@ mod tests {
         dir
     }
 
+    #[tokio::test]
+    async fn api_rejects_oversized_sidecar_text() {
+        let mut app = test_app();
+        let (_chat, _rx) = install(&mut app, SidecarTab::Chat);
+        let response = app.handle_api_request(crate::api::schema::Request {
+            id: "big".into(),
+            method: crate::api::schema::Method::SidecarSend(
+                crate::api::schema::SidecarSendParams {
+                    tab: SidecarTab::Chat,
+                    text: "x".repeat(MAX_SIDECAR_SEND_BYTES + 1),
+                },
+            ),
+        });
+        let value: serde_json::Value = serde_json::from_str(&response).expect("json");
+        assert_eq!(value["error"]["code"], "invalid_request");
+    }
+
+    #[tokio::test]
+    async fn api_show_returns_the_running_terminal() {
+        let mut app = test_app();
+        let (notes, _rx) = install(&mut app, SidecarTab::Notes);
+        let response = app.handle_api_request(crate::api::schema::Request {
+            id: "show".into(),
+            method: crate::api::schema::Method::SidecarShow(
+                crate::api::schema::SidecarShowParams {
+                    tab: SidecarTab::Notes,
+                },
+            ),
+        });
+        let value: serde_json::Value = serde_json::from_str(&response).expect("json");
+        assert_eq!(value["result"]["type"], "sidecar_shown");
+        assert_eq!(
+            value["result"]["terminal_id"],
+            notes.terminal_id.to_string()
+        );
+    }
+
     #[test]
     fn notes_path_is_per_session_under_config_dir() {
         let dir = temp_dir("path");
