@@ -79,6 +79,7 @@ mod notifications;
 mod pane_graphics;
 mod render;
 mod retained_surface;
+mod sidecar;
 mod surface_interest;
 
 pub use bootstrap::run_server;
@@ -2394,6 +2395,9 @@ impl HeadlessServer {
                 client.host_mouse_capture_active = None;
                 true
             }
+            ServerEvent::ClientShellSidecarView { client_id, data } => {
+                self.apply_client_sidecar_view(client_id, &data)
+            }
             ServerEvent::ClientShellPresentationSync { client_id, token } => {
                 let Some(client) = self.clients.get_mut(&client_id) else {
                     return false;
@@ -2520,6 +2524,29 @@ impl HeadlessServer {
                     client.pixel_mouse && client.host_sgr_pixels_active == Some(true)
                 });
                 let mut events = events;
+                if let Some(sidecar_terminal_id) = self
+                    .app
+                    .state
+                    .sidecar
+                    .slots()
+                    .map(|(_, slot)| slot.terminal_id.clone())
+                    .find(|id| id.as_str() == terminal_id)
+                {
+                    let Some(runtime) = self.app.terminal_runtimes.get(&sidecar_terminal_id) else {
+                        return false;
+                    };
+                    super::pane_input::downgrade_ineligible_pixel_mouse(
+                        &mut events,
+                        pixel_mouse,
+                        runtime.current_size(),
+                        runtime.pixel_size(),
+                    );
+                    let scroll_before = runtime.scroll_metrics();
+                    if let Err(err) = apply_client_popup_input_events(runtime, &events) {
+                        warn!(client_id, terminal_id, err = %err, "client sidecar input failed");
+                    }
+                    return runtime.scroll_metrics() != scroll_before;
+                }
                 let Some(popup_terminal_id) = self
                     .app
                     .state

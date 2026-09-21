@@ -572,6 +572,12 @@ impl HeadlessServer {
                     continue;
                 }
             }
+            if matches!(mode, ClientConnectionMode::ClientShell)
+                && self.stream_client_sidecar(client_id).is_err()
+            {
+                broken_clients.push(client_id);
+                continue;
+            }
             let shell_graphics_delivery = self
                 .clients
                 .get(&client_id)

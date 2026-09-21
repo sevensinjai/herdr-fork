@@ -9,6 +9,7 @@ pub(crate) struct DecodedAgentViewProjection {
 pub(crate) enum EndpointControlMessage {
     HealthPong,
     AgentViewProjection(DecodedAgentViewProjection),
+    SidecarSurface(Box<crate::protocol::endpoint::SidecarSurfaceControl>),
     Snapshot(Box<crate::protocol::ClientShellSnapshot>),
     Ignored,
 }
@@ -47,6 +48,12 @@ pub(crate) fn decode_endpoint_control(
             },
         ));
     }
+    if kind == crate::protocol::endpoint::SIDECAR_SURFACE_KIND {
+        // Optional: a malformed surface is dropped rather than failing the endpoint.
+        return Ok(serde_json::from_str(data)
+            .map(|control| EndpointControlMessage::SidecarSurface(Box::new(control)))
+            .unwrap_or(EndpointControlMessage::Ignored));
+    }
     if kind == crate::protocol::endpoint::ENDPOINT_SNAPSHOT_KIND {
         let snapshot = serde_json::from_str(data)
             .map_err(|error| format!("invalid endpoint snapshot: {error}"))?;
@@ -68,6 +75,27 @@ pub(crate) fn protocol_failure_is_fatal(endpoint_id: &ClientEndpointId) -> bool 
 mod tests {
     use super::*;
     use crate::client::endpoint::ProfileId;
+
+    #[test]
+    fn sidecar_surface_controls_decode_and_bad_ones_are_ignored() {
+        let control = crate::protocol::endpoint::SidecarSurfaceControl {
+            tab: crate::api::schema::SidecarTab::Chat,
+            terminal_id: Some("t1".into()),
+            frame: None,
+            mouse_reporting: true,
+        };
+        let data = serde_json::to_string(&control).unwrap();
+        assert!(matches!(
+            decode_endpoint_control(crate::protocol::endpoint::SIDECAR_SURFACE_KIND, &data)
+                .unwrap(),
+            EndpointControlMessage::SidecarSurface(decoded) if *decoded == control
+        ));
+        assert!(matches!(
+            decode_endpoint_control(crate::protocol::endpoint::SIDECAR_SURFACE_KIND, "nope")
+                .unwrap(),
+            EndpointControlMessage::Ignored
+        ));
+    }
 
     #[test]
     fn unknown_optional_controls_are_ignored() {

@@ -855,6 +855,12 @@ pub(crate) struct ClientShellState {
     pub(super) graphics: crate::kitty_graphics::surface::ClientState,
     pub(super) graphics_cell_size: crate::kitty_graphics::HostCellSize,
     pub(super) popup_terminal_id: Option<String>,
+    /// Sidecar panel presentation; `None` while hidden.
+    pub(super) sidecar: Option<super::sidecar::SidecarUi>,
+    /// Tab shown when the Sidecar next opens.
+    pub(super) sidecar_tab: crate::api::schema::SidecarTab,
+    /// Latest Sidecar terminal surface from the active endpoint.
+    pub(super) sidecar_surface: Option<crate::protocol::endpoint::SidecarSurfaceControl>,
     pub(super) sidebar_collapsed: bool,
     pub(super) sidebar_collapsed_manual: bool,
     pub(super) sidebar_width: u16,
@@ -1019,6 +1025,9 @@ impl ClientShellState {
                 height_px: 1,
             },
             popup_terminal_id: None,
+            sidecar: None,
+            sidecar_tab: crate::api::schema::SidecarTab::Notes,
+            sidecar_surface: None,
             sidebar_collapsed,
             sidebar_collapsed_manual: preferences.sidebar_collapsed.is_some(),
             sidebar_width,
@@ -1215,6 +1224,9 @@ impl ClientShellState {
         self.pending_pane_surface = None;
         self.input_leases = ClientInputLeases::default();
         self.popup_terminal_id = None;
+        // Sidecar terminals belong to the endpoint being left.
+        self.sidecar = None;
+        self.sidecar_surface = None;
         self.chrome_drag = None;
         self.workspace_press = None;
         self.tab_press = None;
