@@ -698,6 +698,9 @@ async fn run_client_loop(
                 if let Some(shell) = state.shell.as_mut() {
                     let cleanup = shell.take_pending_graphics_cleanup();
                     let frame = shell.compose(state.reported_size.0, state.reported_size.1);
+                    if let Some(view) = shell.take_sidecar_view_message() {
+                        let _ = write_to_server(&mut write_stream, &view);
+                    }
                     let frozen = state.presentation_frozen;
                     state.presentation_frozen = false;
                     state.present_graphics(&cleanup);

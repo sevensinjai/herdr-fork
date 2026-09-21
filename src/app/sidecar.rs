@@ -106,14 +106,6 @@ impl App {
         self.spawn_sidecar_slot(tab)
     }
 
-    pub(crate) fn sidecar_tab_for_terminal(&self, terminal_id: &TerminalId) -> Option<SidecarTab> {
-        self.state
-            .sidecar
-            .slots()
-            .find(|(_, slot)| &slot.terminal_id == terminal_id)
-            .map(|(tab, _)| tab)
-    }
-
     /// Delivers text to a Sidecar tab. A running terminal gets a paste. A
     /// stopped Notes tab gets the text appended to its file before the editor
     /// opens it. A stopped Chat tab is started and the text is pasted once the
@@ -441,10 +433,6 @@ mod tests {
         assert_eq!(
             app.sidecar_show(SidecarTab::Notes).expect("show"),
             notes.terminal_id
-        );
-        assert_eq!(
-            app.sidecar_tab_for_terminal(&notes.terminal_id),
-            Some(SidecarTab::Notes)
         );
     }
 

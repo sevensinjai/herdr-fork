@@ -916,6 +916,9 @@ impl ClientShellState {
         if self.popup_terminal_id.is_some() {
             return;
         }
+        if self.handle_sidecar_mouse(mouse, point, outcome) {
+            return;
+        }
         if !self.replaying_url_click
             && self.overlay.is_none()
             && self.mode == ClientShellMode::Terminal

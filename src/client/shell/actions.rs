@@ -10,6 +10,16 @@ impl ClientShellState {
             crate::input::KeybindMatch::Action(crate::input::KeybindAction::Detach) => {
                 outcome.detach = true;
             }
+            crate::input::KeybindMatch::Action(crate::input::KeybindAction::SidecarToggle) => {
+                self.toggle_sidecar(outcome);
+            }
+            crate::input::KeybindMatch::Action(crate::input::KeybindAction::SidecarSwitchTab) => {
+                let next = match self.sidecar.map_or(self.sidecar_tab, |ui| ui.tab) {
+                    crate::api::schema::SidecarTab::Notes => crate::api::schema::SidecarTab::Chat,
+                    crate::api::schema::SidecarTab::Chat => crate::api::schema::SidecarTab::Notes,
+                };
+                self.show_sidecar_tab(next, outcome);
+            }
             crate::input::KeybindMatch::Action(crate::input::KeybindAction::ToggleSidebar) => {
                 self.sidebar_collapsed = !self.sidebar_collapsed;
                 self.sidebar_collapsed_manual = true;

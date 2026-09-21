@@ -23,6 +23,7 @@ pub(crate) struct ClientShellConfig {
     pub(super) hide_tab_bar_when_single_tab: bool,
     pub(super) spaces: SpacesSidebarConfig,
     pub(super) agents: crate::config::AgentsSidebarConfig,
+    pub(super) sidecar_width: crate::popup_size::PopupSize,
     pub(super) agent_panel_sort: crate::config::AgentPanelSortConfig,
     pub(super) status_indicators: crate::config::StatusIndicatorStyle,
     pub(super) sound_enabled: bool,
@@ -92,6 +93,10 @@ pub(super) struct ShellHitMap {
     pub(super) tabs: Vec<(Rect, String)>,
     pub(super) panes: Vec<PaneHit>,
     pub(super) popup: Option<PaneHit>,
+    /// Whole Sidecar panel, its terminal area, and its tab labels.
+    pub(super) sidecar_panel: Option<Rect>,
+    pub(super) sidecar_body: Option<PaneHit>,
+    pub(super) sidecar_tabs: Vec<(Rect, crate::api::schema::SidecarTab)>,
     pub(super) pane_splits: Vec<PaneSplitHit>,
     pub(super) agents: Vec<(Rect, String)>,
     pub(super) endpoint_agents: Vec<(Rect, ClientEndpointId, String)>,
@@ -861,6 +866,9 @@ pub(crate) struct ClientShellState {
     pub(super) sidecar_tab: crate::api::schema::SidecarTab,
     /// Latest Sidecar terminal surface from the active endpoint.
     pub(super) sidecar_surface: Option<crate::protocol::endpoint::SidecarSurfaceControl>,
+    /// Last view reported to the server, and one waiting to be sent.
+    pub(super) sidecar_view_sent: Option<crate::protocol::endpoint::SidecarViewControl>,
+    pub(super) sidecar_view_pending: Option<crate::protocol::endpoint::SidecarViewControl>,
     pub(super) sidebar_collapsed: bool,
     pub(super) sidebar_collapsed_manual: bool,
     pub(super) sidebar_width: u16,
@@ -1028,6 +1036,8 @@ impl ClientShellState {
             sidecar: None,
             sidecar_tab: crate::api::schema::SidecarTab::Notes,
             sidecar_surface: None,
+            sidecar_view_sent: None,
+            sidecar_view_pending: None,
             sidebar_collapsed,
             sidebar_collapsed_manual: preferences.sidebar_collapsed.is_some(),
             sidebar_width,
@@ -1227,6 +1237,8 @@ impl ClientShellState {
         // Sidecar terminals belong to the endpoint being left.
         self.sidecar = None;
         self.sidecar_surface = None;
+        self.sidecar_view_sent = None;
+        self.sidecar_view_pending = None;
         self.chrome_drag = None;
         self.workspace_press = None;
         self.tab_press = None;

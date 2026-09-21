@@ -21,21 +21,8 @@ impl HeadlessServer {
             return false;
         }
         client.shell_sidecar_view = Some(view);
-        if view.open && view.cols > 0 && view.rows > 0 {
-            if let Some(slot) = self.app.state.sidecar.slot(view.tab) {
-                if let Some(runtime) = self.app.terminal_runtimes.get(&slot.terminal_id) {
-                    if !self
-                        .app
-                        .state
-                        .direct_attach_resize_locks
-                        .contains(&slot.terminal_id)
-                    {
-                        let cell = client.cell_size;
-                        runtime.resize(view.rows, view.cols, cell.width_px, cell.height_px);
-                    }
-                }
-            }
-        }
+        let cell = client.cell_size;
+        fit_sidecar_to_view(&self.app, view, cell);
         true
     }
 
@@ -46,7 +33,11 @@ impl HeadlessServer {
             return Ok(());
         };
         let next = match client.shell_sidecar_view {
-            Some(view) if view.open => Some(sidecar_surface(&self.app, view)),
+            Some(view) if view.open => {
+                // The view can arrive before `sidecar.show` starts the terminal.
+                fit_sidecar_to_view(&self.app, view, client.cell_size);
+                Some(sidecar_surface(&self.app, view))
+            }
             Some(view) if client.shell_sidecar_sent.is_some() => Some(SidecarSurfaceControl {
                 tab: view.tab,
                 terminal_id: None,
@@ -77,6 +68,33 @@ impl HeadlessServer {
         // A closed surface is sent once; afterwards the client has nothing to draw.
         client.shell_sidecar_sent = next.frame.is_some().then_some(next);
         Ok(())
+    }
+}
+
+/// Resizes the shown Sidecar terminal to `view` when they differ.
+fn fit_sidecar_to_view(
+    app: &crate::app::App,
+    view: SidecarViewControl,
+    cell: crate::kitty_graphics::HostCellSize,
+) {
+    if !view.open || view.cols == 0 || view.rows == 0 {
+        return;
+    }
+    let Some(slot) = app.state.sidecar.slot(view.tab) else {
+        return;
+    };
+    if app
+        .state
+        .direct_attach_resize_locks
+        .contains(&slot.terminal_id)
+    {
+        return;
+    }
+    let Some(runtime) = app.terminal_runtimes.get(&slot.terminal_id) else {
+        return;
+    };
+    if runtime.current_size() != (view.rows, view.cols) {
+        runtime.resize(view.rows, view.cols, cell.width_px, cell.height_px);
     }
 }
 
