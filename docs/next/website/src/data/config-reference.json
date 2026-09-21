@@ -1055,6 +1055,12 @@
           ]
         },
         {
+          "key": "ui.sidebar.agents.group_by",
+          "type": "string",
+          "default": "unset",
+          "description": "Custom pane metadata token, written as $name, to group the Agents panel by. Agents sharing a value are listed together under a heading with the value and its count; agents without the token are listed last under \"ungrouped\". The aggregate multi-machine list is not grouped. Unset keeps the flat list."
+        },
+        {
           "key": "ui.sidebar.agents.row_gap",
           "type": "integer",
           "default": "0",
