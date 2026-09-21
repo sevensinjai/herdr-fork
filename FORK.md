@@ -34,20 +34,35 @@ Files changed relative to upstream:
 
 Base commit: f090ce95d05d2e7811869be93f9a23bf4ac2c3af
 
+## Added the Sidecar panel
+
+A panel that slides in from the right over the panes, holding two terminals
+that keep running while it is hidden. **Notes** is an editor on
+`~/.config/herdr/sidecar/<session>.md`, and **Chat** is a scratch agent
+(`claude` by default). There is one Sidecar per named session. Select text in
+any pane and send it with the pane right-click menu or `prefix+shift+y`.
+Configure it under `[sidecar]`. The keys are `sidecar_toggle`
+(`prefix+shift+s`), `sidecar_switch_tab` (`prefix+shift+o`), and
+`sidecar_send_selection` (`prefix+shift+y`).
+
+Transport: the frozen generation-1 codecs (`PaneSurfaceFrame`, `ClientMessage`,
+`ServerMessage`) are unchanged. The Sidecar travels over the optional
+`sidecar` endpoint capability with two `EndpointControl` kinds,
+`endpoint.sidecar-view.v1` and `endpoint.sidecar-surface.v1`. Two new API
+methods, `sidecar.show` and `sidecar.send`, are pinned separately from the v1
+method fixture. Older servers and clients ignore all of it.
+
+Files: `src/app/sidecar.rs`, `src/server/headless/sidecar.rs`,
+`src/client/shell/sidecar.rs`, `src/config/sidecar.rs`,
+`src/api/schema/sidecar.rs`, plus wiring in the endpoint protocol, client
+shell input/mouse/composition, keybindings, and docs.
+
 ## Status
 
-This change has NOT been compiled. It was written in an environment that
-could not build herdr, because the Zig build step for the vendored
-`libghostty-vt` fetches dependencies from a host that was unreachable there.
-
-Verified: the changed files parse and are rustfmt-clean; the real bodies of
-`apply_grouping`, `group_agent_rows` and `fit_group_label` were compiled
-against the ratatui and unicode-width versions this repo pins and exercised
-with assertions covering ordering, heading boundaries, counts, untagged
-agents, narrow sidebars, and wide-character labels.
-
-Not verified: that the whole crate compiles, `just ci`, or the panel inside a
-running herdr. Expect to fix small compile errors on a first build.
+Both changes compile and pass `cargo clippy -D warnings` and the full
+nextest suite on macOS arm64. The exceptions are five integration tests
+(`api_ping`, `live_handoff`, `multi_client`) that fail identically on
+unmodified `master` in this environment. The Windows cross-lint was not run.
 
 ## Not for upstream
 
