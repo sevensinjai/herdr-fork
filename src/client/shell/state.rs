@@ -530,6 +530,8 @@ pub(super) enum ClientContextMenuAction {
     Zoom,
     ToggleRightClickPassthrough,
     ClosePane,
+    SendSelectionToSidecarNotes,
+    SendSelectionToSidecarChat,
 }
 
 #[derive(Debug)]
@@ -551,6 +553,8 @@ pub(super) enum ClientContextMenuTarget {
         source_pane_id: Option<String>,
         has_manual_label: bool,
         right_click_passthrough: bool,
+        /// A visible selection in this pane can be sent to the Sidecar.
+        can_send_to_sidecar: bool,
     },
 }
 
@@ -645,6 +649,10 @@ pub(super) enum PendingEndpointKind {
         forced: bool,
     },
     SelectionCopy,
+    /// Selection text read for `sidecar.send`.
+    SendToSidecar {
+        tab: crate::api::schema::SidecarTab,
+    },
     PaneScroll {
         pane_id: String,
         serial: u64,

@@ -6,7 +6,11 @@ fn sidecar_state(supported: bool) -> ClientShellState {
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
     state.set_snapshot(Box::new(snapshot()));
     state.set_pane_surface(surface());
-    state.set_endpoint_methods(Some(vec!["sidecar.show".into(), "sidecar.send".into()]));
+    state.set_endpoint_methods(Some(vec![
+        "sidecar.show".into(),
+        "sidecar.send".into(),
+        "pane.selection.read".into(),
+    ]));
     state.set_endpoint_sidecar_supported(&ClientEndpointId::Local, supported);
     state.compose(120, 30).expect("frame");
     state
@@ -185,4 +189,118 @@ fn clicking_a_tab_switches_and_clicking_a_pane_unfocuses() {
         typed.requests.as_slice(),
         [ClientMessage::ClientShellPaneInput { .. }]
     ));
+}
+
+fn endpoint_request_id(outcome: &ClientShellInput) -> String {
+    outcome
+        .actions
+        .iter()
+        .find_map(|action| match action {
+            ClientShellAction::Endpoint { request, .. } => Some(request.id.clone()),
+            _ => None,
+        })
+        .expect("endpoint request")
+}
+
+fn select_in_pane_1(state: &mut ClientShellState) {
+    state.selection = Some(crate::selection::Selection::absolute_range(
+        "pane_1".into(),
+        (0, 0),
+        (0, 2),
+    ));
+}
+
+fn right_click_pane(state: &mut ClientShellState) -> Vec<ClientContextMenuAction> {
+    state.compose(120, 30).expect("frame");
+    let pane = state.hits.panes[0].inner_rect;
+    state.handle_raw_events(vec![RawInputEvent::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: pane.x + 1,
+        row: pane.y,
+        modifiers: KeyModifiers::empty(),
+    })]);
+    match state.overlay.as_ref() {
+        Some(ClientShellOverlay::ContextMenu(menu)) => {
+            menu.items().iter().map(|item| item.action).collect()
+        }
+        _ => panic!("pane context menu"),
+    }
+}
+
+#[test]
+fn pane_menu_offers_sidecar_send_only_for_a_selection_in_that_pane() {
+    let mut state = sidecar_state(true);
+    let without = right_click_pane(&mut state);
+    assert!(!without.contains(&ClientContextMenuAction::SendSelectionToSidecarNotes));
+
+    state.overlay = None;
+    select_in_pane_1(&mut state);
+    let with = right_click_pane(&mut state);
+    assert!(with.contains(&ClientContextMenuAction::SendSelectionToSidecarNotes));
+    assert!(with.contains(&ClientContextMenuAction::SendSelectionToSidecarChat));
+
+    let mut state = sidecar_state(false);
+    select_in_pane_1(&mut state);
+    let unsupported = right_click_pane(&mut state);
+    assert!(!unsupported.contains(&ClientContextMenuAction::SendSelectionToSidecarNotes));
+}
+
+#[test]
+fn sending_a_selection_reads_it_then_calls_sidecar_send() {
+    let mut state = sidecar_state(true);
+    select_in_pane_1(&mut state);
+    let mut outcome = ClientShellInput::default();
+    state.request_selection_send_to_sidecar(SidecarTab::Chat, &mut outcome);
+    let read_id = endpoint_request_id(&outcome);
+    assert!(outcome.actions.iter().any(|action| matches!(
+        action,
+        ClientShellAction::Endpoint { request, .. }
+            if matches!(request.method, crate::api::schema::Method::PaneSelectionRead(_))
+    )));
+
+    let (_, actions) = state.handle_endpoint_result(
+        "boot-1",
+        &read_id,
+        Ok(crate::api::schema::ResponseResult::PaneSelection {
+            pane_id: "pane_1".into(),
+            text: "picked".into(),
+        }),
+    );
+    assert!(actions.iter().any(|action| matches!(
+        action,
+        ClientShellAction::Endpoint { request, .. }
+            if matches!(
+                &request.method,
+                crate::api::schema::Method::SidecarSend(params)
+                    if params.tab == SidecarTab::Chat && params.text == "picked"
+            )
+    )));
+}
+
+#[test]
+fn send_selection_key_targets_notes_until_another_tab_is_used() {
+    let mut state = sidecar_state(true);
+    select_in_pane_1(&mut state);
+    let mut outcome = ClientShellInput::default();
+    state.record_binding(
+        crate::input::KeybindMatch::Action(crate::input::KeybindAction::SidecarSendSelection),
+        &mut outcome,
+    );
+    let read_id = endpoint_request_id(&outcome);
+    let (_, actions) = state.handle_endpoint_result(
+        "boot-1",
+        &read_id,
+        Ok(crate::api::schema::ResponseResult::PaneSelection {
+            pane_id: "pane_1".into(),
+            text: "note this".into(),
+        }),
+    );
+    assert!(actions.iter().any(|action| matches!(
+        action,
+        ClientShellAction::Endpoint { request, .. }
+            if matches!(
+                &request.method,
+                crate::api::schema::Method::SidecarSend(params) if params.tab == SidecarTab::Notes
+            )
+    )));
 }
