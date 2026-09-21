@@ -193,7 +193,31 @@ impl schemars::JsonSchema for PopupSize {
 
 #[cfg(test)]
 mod tests {
-    use super::PopupSize;
+    use super::{
+        resolve_right_docked_geometry, PopupSize, SIDECAR_KEEP_VISIBLE_COLS, SIDECAR_MIN_COLS,
+    };
+    use ratatui::layout::Rect;
+
+    #[test]
+    fn right_docked_geometry_hugs_the_right_edge_at_full_height() {
+        let area = Rect::new(0, 1, 120, 40);
+        let geometry = resolve_right_docked_geometry(PopupSize::Percent(35), area).expect("fits");
+        assert_eq!(geometry.outer, Rect::new(78, 1, 42, 40));
+        assert_eq!(geometry.inner, Rect::new(79, 2, 41, 39));
+    }
+
+    #[test]
+    fn right_docked_geometry_clamps_width_and_rejects_tiny_areas() {
+        let area = Rect::new(0, 0, 100, 30);
+        let narrow = resolve_right_docked_geometry(PopupSize::Cells(5), area).expect("fits");
+        assert_eq!(narrow.outer.width, SIDECAR_MIN_COLS);
+        let wide = resolve_right_docked_geometry(PopupSize::Percent(100), area).expect("fits");
+        assert_eq!(wide.outer.width, 100 - SIDECAR_KEEP_VISIBLE_COLS);
+        assert!(
+            resolve_right_docked_geometry(PopupSize::Percent(35), Rect::new(0, 0, 39, 30))
+                .is_none()
+        );
+    }
 
     #[test]
     fn parses_cells_and_percent() {
