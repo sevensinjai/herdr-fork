@@ -132,7 +132,9 @@ pub(super) fn aggregate_agent_rows<'a>(
 
     let mut rows = cached_endpoint_snapshots(endpoints)
         .flat_map(|endpoint| {
-            super::agent_sidebar::ordered_agent_pane_ids(endpoint.snapshot, sort)
+            // Grouping is a single-server presentation concern; the aggregate
+            // multi-machine list keeps its own ordering.
+            super::agent_sidebar::ordered_agent_pane_ids(endpoint.snapshot, sort, None)
                 .into_iter()
                 .filter_map(move |pane_id| {
                     let agent = endpoint
