@@ -179,6 +179,10 @@ pub(crate) struct ClientConnection {
     pub(crate) shell_snapshot: Option<crate::protocol::ClientShellSnapshot>,
     /// View policy paired with the last coherent shell replacement.
     pub(crate) shell_agent_view: Option<crate::api::schema::AgentViewSetParams>,
+    /// This client's Sidecar view; `None` until it reports one.
+    pub(crate) shell_sidecar_view: Option<crate::protocol::endpoint::SidecarViewControl>,
+    /// Last Sidecar surface sent, so unchanged frames are not resent.
+    pub(crate) shell_sidecar_sent: Option<crate::protocol::endpoint::SidecarSurfaceControl>,
     /// Monotonic shell replacement revision for this connection.
     pub(crate) shell_projection_revision: u64,
     /// Whether this shell is waiting for one ordered endpoint command response.
@@ -247,6 +251,8 @@ impl ClientConnection {
             shell_location: None,
             shell_snapshot: None,
             shell_agent_view: None,
+            shell_sidecar_view: None,
+            shell_sidecar_sent: None,
             shell_projection_revision: 0,
             shell_endpoint_command_in_flight: false,
             shell_endpoint_command_surface_revision: None,

@@ -123,6 +123,7 @@ impl ClientShellConfig {
             hide_tab_bar_when_single_tab: config.ui.hide_tab_bar_when_single_tab,
             spaces: config.ui.sidebar.spaces.clone(),
             agents: config.ui.sidebar.agents.clone(),
+            sidecar_width: config.sidecar.width,
             agent_panel_sort: config.ui.agent_panel_sort,
             status_indicators: config.ui.status_indicators,
             sound_enabled: config.ui.sound.enabled,
@@ -342,6 +343,10 @@ impl ClientShellConfig {
                 self.right_click_passthrough_modifiers = ui.right_click_passthrough_modifiers();
                 self.redraw_on_focus_gained = ui.redraw_on_focus_gained;
             }
+        }
+
+        if !invalid_section("sidecar") {
+            self.sidecar_width = config.sidecar.width;
         }
 
         if !invalid_section("theme") {

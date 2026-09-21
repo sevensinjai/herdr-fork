@@ -1458,3 +1458,27 @@ fn pane_link_resolve_round_trips() {
         result
     );
 }
+
+#[test]
+fn sidecar_show_and_send_requests_round_trip() {
+    let show: Request = serde_json::from_value(serde_json::json!({
+        "id": "s1", "method": "sidecar.show", "params": {"tab": "notes"}
+    }))
+    .unwrap();
+    assert!(matches!(
+        &show.method,
+        Method::SidecarShow(params) if params.tab == SidecarTab::Notes
+    ));
+    let send: Request = serde_json::from_value(serde_json::json!({
+        "id": "s2", "method": "sidecar.send", "params": {"tab": "chat", "text": "hi"}
+    }))
+    .unwrap();
+    assert!(matches!(
+        &send.method,
+        Method::SidecarSend(params) if params.tab == SidecarTab::Chat && params.text == "hi"
+    ));
+    assert_eq!(
+        serde_json::to_value(&send).unwrap()["method"],
+        "sidecar.send"
+    );
+}

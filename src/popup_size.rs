@@ -47,6 +47,28 @@ pub(crate) struct PopupResolvedGeometry {
     pub inner: Rect,
 }
 
+/// Minimum Sidecar width in cells.
+pub(crate) const SIDECAR_MIN_COLS: u16 = 30;
+/// Cells of pane area the Sidecar always leaves uncovered.
+pub(crate) const SIDECAR_KEEP_VISIBLE_COLS: u16 = 10;
+
+/// Geometry for the right-docked Sidecar: full height of `area`, a left border
+/// column and a header row, the terminal in the rest. `None` when the area is
+/// too small to fit the minimum width next to the uncovered margin.
+pub(crate) fn resolve_right_docked_geometry(
+    width: PopupSize,
+    area: Rect,
+) -> Option<PopupResolvedGeometry> {
+    let max = area.width.checked_sub(SIDECAR_KEEP_VISIBLE_COLS)?;
+    if max < SIDECAR_MIN_COLS || area.height < 3 {
+        return None;
+    }
+    let outer_width = width.resolve(area.width).clamp(SIDECAR_MIN_COLS, max);
+    let outer = Rect::new(area.right() - outer_width, area.y, outer_width, area.height);
+    let inner = Rect::new(outer.x + 1, outer.y + 1, outer.width - 1, outer.height - 1);
+    Some(PopupResolvedGeometry { outer, inner })
+}
+
 pub(crate) fn resolve_popup_geometry(
     width: Option<PopupSize>,
     height: Option<PopupSize>,
@@ -171,7 +193,31 @@ impl schemars::JsonSchema for PopupSize {
 
 #[cfg(test)]
 mod tests {
-    use super::PopupSize;
+    use super::{
+        resolve_right_docked_geometry, PopupSize, SIDECAR_KEEP_VISIBLE_COLS, SIDECAR_MIN_COLS,
+    };
+    use ratatui::layout::Rect;
+
+    #[test]
+    fn right_docked_geometry_hugs_the_right_edge_at_full_height() {
+        let area = Rect::new(0, 1, 120, 40);
+        let geometry = resolve_right_docked_geometry(PopupSize::Percent(35), area).expect("fits");
+        assert_eq!(geometry.outer, Rect::new(78, 1, 42, 40));
+        assert_eq!(geometry.inner, Rect::new(79, 2, 41, 39));
+    }
+
+    #[test]
+    fn right_docked_geometry_clamps_width_and_rejects_tiny_areas() {
+        let area = Rect::new(0, 0, 100, 30);
+        let narrow = resolve_right_docked_geometry(PopupSize::Cells(5), area).expect("fits");
+        assert_eq!(narrow.outer.width, SIDECAR_MIN_COLS);
+        let wide = resolve_right_docked_geometry(PopupSize::Percent(100), area).expect("fits");
+        assert_eq!(wide.outer.width, 100 - SIDECAR_KEEP_VISIBLE_COLS);
+        assert!(
+            resolve_right_docked_geometry(PopupSize::Percent(35), Rect::new(0, 0, 39, 30))
+                .is_none()
+        );
+    }
 
     #[test]
     fn parses_cells_and_percent() {

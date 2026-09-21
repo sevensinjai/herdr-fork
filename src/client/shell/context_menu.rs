@@ -79,9 +79,21 @@ impl ClientContextMenuOverlay {
                 source_pane_id,
                 has_manual_label,
                 right_click_passthrough,
+                can_send_to_sidecar,
                 ..
             } => {
-                let mut items = vec![item("Rename pane", Action::RenamePane)];
+                let mut items = Vec::new();
+                if *can_send_to_sidecar {
+                    items.push(item(
+                        "Send to Sidecar Notes",
+                        Action::SendSelectionToSidecarNotes,
+                    ));
+                    items.push(item(
+                        "Send to Sidecar Chat",
+                        Action::SendSelectionToSidecarChat,
+                    ));
+                }
+                items.push(item("Rename pane", Action::RenamePane));
                 if *has_manual_label {
                     items.push(item("Clear pane name", Action::ClearPaneName));
                 }
@@ -206,6 +218,11 @@ impl ClientShellState {
             .focused_pane_id
             .clone()
             .filter(|focused| focused != &pane_id);
+        let can_send_to_sidecar = self.sidecar_supported()
+            && self
+                .selection
+                .as_ref()
+                .is_some_and(|selection| selection.pane_id == pane_id && selection.is_visible());
         self.overlay = Some(ClientShellOverlay::ContextMenu(ClientContextMenuOverlay {
             target: ClientContextMenuTarget::Pane {
                 pane_id,
@@ -213,6 +230,7 @@ impl ClientShellState {
                 source_pane_id,
                 has_manual_label: pane.label.is_some(),
                 right_click_passthrough: pane.right_click_passthrough,
+                can_send_to_sidecar,
             },
             x,
             y,
@@ -521,6 +539,18 @@ impl ClientShellState {
         };
 
         match action {
+            ClientContextMenuAction::SendSelectionToSidecarNotes => {
+                self.request_selection_send_to_sidecar(
+                    crate::api::schema::SidecarTab::Notes,
+                    outcome,
+                );
+            }
+            ClientContextMenuAction::SendSelectionToSidecarChat => {
+                self.request_selection_send_to_sidecar(
+                    crate::api::schema::SidecarTab::Chat,
+                    outcome,
+                );
+            }
             ClientContextMenuAction::RenamePane => {
                 let label = self.snapshot.as_deref().and_then(|snapshot| {
                     snapshot

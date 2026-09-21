@@ -29,6 +29,13 @@ pub const HEALTH_PING_KIND: &str = "endpoint.health.ping.v1";
 pub const HEALTH_PONG_KIND: &str = "endpoint.health.pong.v1";
 pub const AGENT_VIEW_PROJECTION_CAPABILITY: &str = "agent_view_projection";
 pub const AGENT_VIEW_PROJECTION_KIND: &str = "endpoint.agent-view.v1";
+/// Optional Sidecar panel. Absent on older servers, which also ignore the
+/// two Sidecar control kinds.
+pub const SIDECAR_CAPABILITY: &str = "sidecar";
+/// Client -> server: this client's Sidecar view (`SidecarViewControl`).
+pub const SIDECAR_VIEW_KIND: &str = "endpoint.sidecar-view.v1";
+/// Server -> client: the visible Sidecar terminal (`SidecarSurfaceControl`).
+pub const SIDECAR_SURFACE_KIND: &str = "endpoint.sidecar-surface.v1";
 
 fn default_true() -> bool {
     true
@@ -76,6 +83,45 @@ pub struct EndpointAgentViewProjection {
     pub revision: u64,
     #[serde(default)]
     pub view: Option<serde_json::Value>,
+}
+
+/// Whether this client shows the Sidecar, which tab, and the terminal size it
+/// draws it at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SidecarViewControl {
+    pub open: bool,
+    pub tab: crate::api::schema::SidecarTab,
+    pub cols: u16,
+    pub rows: u16,
+}
+
+/// The Sidecar terminal a client should draw. `frame: None` means nothing is
+/// shown: the view closed or the tab's process exited.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SidecarSurfaceControl {
+    pub tab: crate::api::schema::SidecarTab,
+    #[serde(default)]
+    pub terminal_id: Option<String>,
+    #[serde(default)]
+    pub frame: Option<super::FrameData>,
+    #[serde(default)]
+    pub mouse_reporting: bool,
+}
+
+pub fn sidecar_view_message(view: &SidecarViewControl) -> serde_json::Result<super::ClientMessage> {
+    Ok(super::ClientMessage::EndpointControl {
+        kind: SIDECAR_VIEW_KIND.into(),
+        data: serde_json::to_string(view)?,
+    })
+}
+
+pub fn sidecar_surface_message(
+    surface: &SidecarSurfaceControl,
+) -> serde_json::Result<ServerMessage> {
+    Ok(ServerMessage::EndpointControl {
+        kind: SIDECAR_SURFACE_KIND.into(),
+        data: serde_json::to_string(surface)?,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -151,6 +197,7 @@ impl EndpointServerWelcome {
                 PRESENTATION_EFFECTS_FENCE_CAPABILITY.into(),
                 HEALTH_CHECK_CAPABILITY.into(),
                 AGENT_VIEW_PROJECTION_CAPABILITY.into(),
+                SIDECAR_CAPABILITY.into(),
             ],
             error: None,
         }
@@ -177,6 +224,51 @@ impl EndpointServerWelcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn welcome_advertises_sidecar_and_controls_round_trip() {
+        let welcome = EndpointServerWelcome::compatible(Vec::new());
+        assert!(welcome.capabilities.iter().any(|c| c == SIDECAR_CAPABILITY));
+
+        let view = SidecarViewControl {
+            open: true,
+            tab: crate::api::schema::SidecarTab::Chat,
+            cols: 40,
+            rows: 20,
+        };
+        let crate::protocol::ClientMessage::EndpointControl { kind, data } =
+            sidecar_view_message(&view).expect("view message")
+        else {
+            panic!("endpoint control");
+        };
+        assert_eq!(kind, SIDECAR_VIEW_KIND);
+        assert_eq!(
+            serde_json::from_str::<SidecarViewControl>(&data).expect("view"),
+            view
+        );
+
+        let closed = SidecarSurfaceControl {
+            tab: crate::api::schema::SidecarTab::Notes,
+            terminal_id: None,
+            frame: None,
+            mouse_reporting: false,
+        };
+        let ServerMessage::EndpointControl { kind, data } =
+            sidecar_surface_message(&closed).expect("surface message")
+        else {
+            panic!("endpoint control");
+        };
+        assert_eq!(kind, SIDECAR_SURFACE_KIND);
+        assert_eq!(
+            serde_json::from_str::<SidecarSurfaceControl>(&data).expect("surface"),
+            closed
+        );
+        // Older decoders see only optional fields beyond the tab.
+        assert_eq!(
+            serde_json::from_str::<SidecarSurfaceControl>(r#"{"tab":"notes"}"#).expect("minimal"),
+            closed
+        );
+    }
 
     fn hello() -> EndpointClientHello {
         EndpointClientHello {
@@ -357,6 +449,7 @@ mod tests {
                 PRESENTATION_EFFECTS_FENCE_CAPABILITY.to_string(),
                 HEALTH_CHECK_CAPABILITY.to_string(),
                 AGENT_VIEW_PROJECTION_CAPABILITY.to_string(),
+                SIDECAR_CAPABILITY.to_string(),
             ]
         );
     }

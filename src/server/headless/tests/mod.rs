@@ -6943,3 +6943,115 @@ fn no_handle_internal_event_bypass_in_module() {
         bypass_lines.join("\n  ")
     );
 }
+
+fn sidecar_surface_controls(
+    control_rx: &std::sync::mpsc::Receiver<Vec<u8>>,
+) -> Vec<crate::protocol::endpoint::SidecarSurfaceControl> {
+    control_rx
+        .try_iter()
+        .filter_map(|bytes| match read_server_message(bytes) {
+            ServerMessage::EndpointControl { kind, data }
+                if kind == crate::protocol::endpoint::SIDECAR_SURFACE_KIND =>
+            {
+                Some(serde_json::from_str(&data).expect("sidecar surface json"))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn sidecar_view_event(client_id: u64, open: bool, cols: u16, rows: u16) -> ServerEvent {
+    ServerEvent::ClientShellSidecarView {
+        client_id,
+        data: serde_json::to_string(&crate::protocol::endpoint::SidecarViewControl {
+            open,
+            tab: crate::api::schema::SidecarTab::Notes,
+            cols,
+            rows,
+        })
+        .expect("view json"),
+    }
+}
+
+#[tokio::test]
+async fn client_shell_streams_an_open_sidecar_and_routes_its_input() {
+    let mut server = test_headless_server();
+    let _pane_input = install_focused_test_runtime(&mut server, b"base-pane");
+    let (runtime, mut sidecar_input) =
+        crate::terminal::TerminalRuntime::test_with_channel_and_scrollback_bytes(
+            40,
+            12,
+            0,
+            b"SIDECAR_NOTES_LIVE",
+            4,
+        );
+    let terminal_id = crate::terminal::TerminalId::alloc();
+    server.app.install_sidecar_runtime(
+        crate::api::schema::SidecarTab::Notes,
+        crate::layout::PaneId::alloc(),
+        terminal_id.clone(),
+        runtime,
+        std::path::PathBuf::from("/"),
+    );
+
+    let (writer, control_rx, _render_rx) = test_client_writer();
+    assert!(
+        server.handle_server_event(ServerEvent::ClientShellConnected {
+            surface_reuse: false,
+            surface_delta: false,
+            client_id: 12,
+            surface_cols: 80,
+            surface_rows: 23,
+            cell_width_px: 10,
+            cell_height_px: 20,
+            pixel_mouse: false,
+            direct_graphics: false,
+            endpoint_keybindings: false,
+            mouse_capture: false,
+            surface_active: true,
+            writer,
+        })
+    );
+    server.render_and_stream();
+    assert!(
+        sidecar_surface_controls(&control_rx).is_empty(),
+        "hidden sidecar streams nothing"
+    );
+
+    assert!(server.handle_server_event(sidecar_view_event(12, true, 30, 10)));
+    server.render_and_stream();
+    let opened = sidecar_surface_controls(&control_rx);
+    let [surface] = opened.as_slice() else {
+        panic!("one sidecar surface, got {}", opened.len());
+    };
+    assert_eq!(surface.terminal_id.as_deref(), Some(terminal_id.as_str()));
+    let frame = surface.frame.as_ref().expect("frame");
+    assert_eq!((frame.width, frame.height), (30, 10));
+    assert!(frame_text(frame).contains("SIDECAR_NOTES_LIVE"));
+
+    server.render_and_stream();
+    assert!(
+        sidecar_surface_controls(&control_rx).is_empty(),
+        "an unchanged sidecar is not resent"
+    );
+
+    server.handle_server_event(ServerEvent::ClientShellPopupInput {
+        client_id: 12,
+        terminal_id: terminal_id.to_string(),
+        events: vec![crate::protocol::ClientPaneInputEvent::TextCommit(
+            "typed".into(),
+        )],
+    });
+    assert_eq!(
+        sidecar_input.try_recv().expect("sidecar input").as_ref(),
+        b"typed"
+    );
+
+    assert!(server.handle_server_event(sidecar_view_event(12, false, 30, 10)));
+    server.render_and_stream();
+    let closed = sidecar_surface_controls(&control_rx);
+    let [surface] = closed.as_slice() else {
+        panic!("one closing surface, got {}", closed.len());
+    };
+    assert!(surface.frame.is_none());
+}

@@ -10,6 +10,22 @@ impl ClientShellState {
             crate::input::KeybindMatch::Action(crate::input::KeybindAction::Detach) => {
                 outcome.detach = true;
             }
+            crate::input::KeybindMatch::Action(crate::input::KeybindAction::SidecarToggle) => {
+                self.toggle_sidecar(outcome);
+            }
+            crate::input::KeybindMatch::Action(crate::input::KeybindAction::SidecarSwitchTab) => {
+                let next = match self.sidecar.map_or(self.sidecar_tab, |ui| ui.tab) {
+                    crate::api::schema::SidecarTab::Notes => crate::api::schema::SidecarTab::Chat,
+                    crate::api::schema::SidecarTab::Chat => crate::api::schema::SidecarTab::Notes,
+                };
+                self.show_sidecar_tab(next, outcome);
+            }
+            crate::input::KeybindMatch::Action(
+                crate::input::KeybindAction::SidecarSendSelection,
+            ) => {
+                let tab = self.sidecar.map_or(self.sidecar_tab, |ui| ui.tab);
+                self.request_selection_send_to_sidecar(tab, outcome);
+            }
             crate::input::KeybindMatch::Action(crate::input::KeybindAction::ToggleSidebar) => {
                 self.sidebar_collapsed = !self.sidebar_collapsed;
                 self.sidebar_collapsed_manual = true;
@@ -271,6 +287,32 @@ impl ClientShellState {
     }
 
     pub(super) fn request_selection_copy(&mut self, outcome: &mut ClientShellInput, live: bool) {
+        self.request_selection_read(PendingEndpointKind::SelectionCopy, outcome, live);
+    }
+
+    /// Reads the visible selection and sends it to a Sidecar tab.
+    pub(super) fn request_selection_send_to_sidecar(
+        &mut self,
+        tab: crate::api::schema::SidecarTab,
+        outcome: &mut ClientShellInput,
+    ) {
+        if !self.sidecar_supported()
+            || !self
+                .selection
+                .as_ref()
+                .is_some_and(crate::selection::Selection::is_visible)
+        {
+            return;
+        }
+        self.request_selection_read(PendingEndpointKind::SendToSidecar { tab }, outcome, true);
+    }
+
+    fn request_selection_read(
+        &mut self,
+        kind: PendingEndpointKind,
+        outcome: &mut ClientShellInput,
+        live: bool,
+    ) {
         let Some(selection) = self.selection.as_ref() else {
             return;
         };
@@ -299,7 +341,7 @@ impl ClientShellState {
                     content_revision,
                 },
             ),
-            PendingEndpointKind::SelectionCopy,
+            kind,
             outcome,
         );
     }
@@ -637,6 +679,30 @@ impl ClientShellState {
                             repaint,
                             vec![ClientShellAction::ClipboardWrite(text.into_bytes())],
                         )
+                    }
+                    Ok(crate::api::schema::ResponseResult::PaneSelection { .. }) => {
+                        (false, Vec::new())
+                    }
+                    Ok(_) => {
+                        self.set_endpoint_error("endpoint returned an unexpected selection result");
+                        (true, Vec::new())
+                    }
+                    Err(_) => (true, Vec::new()),
+                };
+            }
+            PendingEndpointKind::SendToSidecar { tab } => {
+                return match result {
+                    Ok(crate::api::schema::ResponseResult::PaneSelection { text, .. })
+                        if !text.is_empty() =>
+                    {
+                        let mut outcome = ClientShellInput::default();
+                        self.push_endpoint_method(
+                            crate::api::schema::Method::SidecarSend(
+                                crate::api::schema::SidecarSendParams { tab, text },
+                            ),
+                            &mut outcome,
+                        );
+                        (outcome.repaint, outcome.actions)
                     }
                     Ok(crate::api::schema::ResponseResult::PaneSelection { .. }) => {
                         (false, Vec::new())

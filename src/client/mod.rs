@@ -435,6 +435,17 @@ async fn run_client_loop(
                 .as_ref()
                 .and_then(|(_, handshake)| handshake.endpoint_methods.clone()),
         );
+        shell.set_endpoint_sidecar_supported(
+            &endpoint::ClientEndpointId::Local,
+            initial
+                .as_ref()
+                .and_then(|(_, handshake)| handshake.endpoint_capabilities.as_ref())
+                .is_some_and(|capabilities| {
+                    capabilities.iter().any(|capability| {
+                        capability == crate::protocol::endpoint::SIDECAR_CAPABILITY
+                    })
+                }),
+        );
         shell.set_endpoint_agent_view_projection_supported(
             &endpoint::ClientEndpointId::Local,
             initial
@@ -687,6 +698,9 @@ async fn run_client_loop(
                 if let Some(shell) = state.shell.as_mut() {
                     let cleanup = shell.take_pending_graphics_cleanup();
                     let frame = shell.compose(state.reported_size.0, state.reported_size.1);
+                    if let Some(view) = shell.take_sidecar_view_message() {
+                        let _ = write_to_server(&mut write_stream, &view);
+                    }
                     let frozen = state.presentation_frozen;
                     state.presentation_frozen = false;
                     state.present_graphics(&cleanup);
@@ -1218,8 +1232,11 @@ async fn run_client_loop(
                     let agent_view_projection_supported = negotiation.supports_capability(
                         crate::protocol::endpoint::AGENT_VIEW_PROJECTION_CAPABILITY,
                     );
+                    let sidecar_supported = negotiation
+                        .supports_capability(crate::protocol::endpoint::SIDECAR_CAPABILITY);
                     let frame = state.shell.as_mut().and_then(|shell| {
                         shell.set_endpoint_methods_for(&endpoint_id, Some(negotiation.methods()));
+                        shell.set_endpoint_sidecar_supported(&endpoint_id, sidecar_supported);
                         shell.set_endpoint_agent_view_projection_supported(
                             &endpoint_id,
                             agent_view_projection_supported,
@@ -1910,6 +1927,12 @@ async fn run_client_loop(
                                         generation,
                                         projection,
                                     );
+                                }
+                                continue;
+                            }
+                            Ok(endpoint::EndpointControlMessage::SidecarSurface(surface)) => {
+                                if let Some(shell) = state.shell.as_mut() {
+                                    shell.set_sidecar_surface(&endpoint_id, *surface);
                                 }
                                 continue;
                             }

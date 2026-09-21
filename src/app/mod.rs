@@ -21,6 +21,7 @@ pub(crate) mod pane_graphics;
 mod popup;
 mod runtime;
 mod session;
+pub(crate) mod sidecar;
 pub mod state;
 mod tab_bar_status;
 mod terminal_targets;
@@ -519,6 +520,8 @@ impl App {
             installed_plugins: load_plugin_registry(policy.persist_plugin_registry),
             plugin_panes: std::collections::HashMap::new(),
             popup_pane: None,
+            sidecar: crate::app::sidecar::SidecarState::default(),
+            sidecar_config: config.sidecar.clone(),
             plugin_command_logs: Vec::new(),
             next_plugin_command_log_id: 1,
             plugin_commands_in_flight: 0,
@@ -934,6 +937,10 @@ impl App {
         if !invalid_section("worktrees") {
             self.state.worktree_directory =
                 crate::worktree::expand_tilde_absolute_path(&config.worktrees.directory);
+        }
+
+        if !invalid_section("sidecar") {
+            self.state.sidecar_config = config.sidecar.clone();
         }
 
         if !invalid_section("theme") {

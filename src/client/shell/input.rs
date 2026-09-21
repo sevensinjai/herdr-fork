@@ -571,7 +571,8 @@ impl ClientShellState {
                     outcome.repaint = true;
                     return None;
                 }
-                self.focused_pane_id().map(ClientInputTarget::Pane)
+                self.sidecar_input_target()
+                    .or_else(|| self.focused_pane_id().map(ClientInputTarget::Pane))
             }
             ClientShellMode::Prefix => {
                 let return_mode = if self.copy_mode.as_ref().is_some_and(|copy_mode| {
@@ -584,7 +585,9 @@ impl ClientShellState {
                 if crate::config::terminal_key_matches_combo(key, self.config.keybinds.prefix) {
                     self.mode = return_mode;
                     outcome.repaint = true;
-                    return self.focused_pane_id().map(ClientInputTarget::Pane);
+                    return self
+                        .sidecar_input_target()
+                        .or_else(|| self.focused_pane_id().map(ClientInputTarget::Pane));
                 }
                 if key.code == KeyCode::Esc {
                     self.mode = return_mode;
@@ -1020,8 +1023,11 @@ impl ClientShellState {
         }
     }
 
+    /// Sends to the focused Sidecar terminal, else the focused pane.
     fn push_focused_pane_event(&self, event: ClientPaneInputEvent, outcome: &mut ClientShellInput) {
-        if let Some(pane_id) = self.focused_pane_id() {
+        if let Some(target) = self.sidecar_input_target() {
+            super::push_target_event(target, event, outcome);
+        } else if let Some(pane_id) = self.focused_pane_id() {
             super::push_target_event(ClientInputTarget::Pane(pane_id), event, outcome);
         }
     }
