@@ -106,14 +106,14 @@ holds two terminals that keep running while it is hidden:
 ```toml
 [sidecar]
 width = "35%"
-notes_command = '${EDITOR:-nvim} "$HERDR_SIDECAR_NOTES"'
+notes_command = '${EDITOR:-vi} "$HERDR_SIDECAR_NOTES"'
 chat_command = "claude"
 ```
 
 `width` accepts cells or a percentage of the pane area. The panel is at least 30
 columns wide and always leaves 10 columns of panes visible. A command starts the
 first time its tab is shown, in the focused pane's directory. If it exits, the
-next show starts it again.
+panel says so, and the next show starts it again.
 
 `prefix+shift+s` shows or hides the Sidecar, and `prefix+shift+o` switches tabs.
 Click a tab name to switch tabs, or click a pane to return focus to it. While

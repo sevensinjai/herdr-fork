@@ -7055,3 +7055,49 @@ async fn client_shell_streams_an_open_sidecar_and_routes_its_input() {
     };
     assert!(surface.frame.is_none());
 }
+
+#[tokio::test]
+async fn sidecar_reports_an_exited_tab_once() {
+    let mut server = test_headless_server();
+    let _pane_input = install_focused_test_runtime(&mut server, b"base-pane");
+    let (runtime, _input) = crate::terminal::TerminalRuntime::test_with_channel(40, 12);
+    let pane_id = crate::layout::PaneId::alloc();
+    server.app.install_sidecar_runtime(
+        crate::api::schema::SidecarTab::Notes,
+        pane_id,
+        crate::terminal::TerminalId::alloc(),
+        runtime,
+        std::path::PathBuf::from("/"),
+    );
+    assert!(server.app.handle_sidecar_pane_died(pane_id));
+
+    let (writer, control_rx, _render_rx) = test_client_writer();
+    server.handle_server_event(ServerEvent::ClientShellConnected {
+        surface_reuse: false,
+        surface_delta: false,
+        client_id: 12,
+        surface_cols: 80,
+        surface_rows: 23,
+        cell_width_px: 10,
+        cell_height_px: 20,
+        pixel_mouse: false,
+        direct_graphics: false,
+        endpoint_keybindings: false,
+        mouse_capture: false,
+        surface_active: true,
+        writer,
+    });
+    assert!(server.handle_server_event(sidecar_view_event(12, true, 30, 10)));
+    server.render_and_stream();
+    let sent = sidecar_surface_controls(&control_rx);
+    let [surface] = sent.as_slice() else {
+        panic!("one exited surface, got {}", sent.len());
+    };
+    assert!(surface.exited && surface.frame.is_none());
+
+    server.render_and_stream();
+    assert!(
+        sidecar_surface_controls(&control_rx).is_empty(),
+        "an unchanged empty sidecar is not resent every render"
+    );
+}

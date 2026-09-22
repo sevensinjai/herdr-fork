@@ -106,6 +106,9 @@ pub struct SidecarSurfaceControl {
     pub frame: Option<super::FrameData>,
     #[serde(default)]
     pub mouse_reporting: bool,
+    /// The tab's command exited and nothing is running.
+    #[serde(default)]
+    pub exited: bool,
 }
 
 pub fn sidecar_view_message(view: &SidecarViewControl) -> serde_json::Result<super::ClientMessage> {
@@ -252,6 +255,7 @@ mod tests {
             terminal_id: None,
             frame: None,
             mouse_reporting: false,
+            exited: false,
         };
         let ServerMessage::EndpointControl { kind, data } =
             sidecar_surface_message(&closed).expect("surface message")

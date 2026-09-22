@@ -62,6 +62,7 @@ fn install_surface(state: &mut ClientShellState, tab: SidecarTab, text: &str) {
                 &[],
             )),
             mouse_reporting: false,
+            exited: false,
         },
     );
 }
@@ -416,4 +417,23 @@ fn header_close_button_hides_the_sidecar() {
         modifiers: KeyModifiers::empty(),
     })]);
     assert!(state.sidecar.is_none());
+}
+
+#[test]
+fn an_exited_tab_says_so_instead_of_starting() {
+    let mut state = sidecar_state(true);
+    toggle(&mut state);
+    state.set_sidecar_surface(
+        &ClientEndpointId::Local,
+        SidecarSurfaceControl {
+            tab: SidecarTab::Notes,
+            terminal_id: None,
+            frame: None,
+            mouse_reporting: false,
+            exited: true,
+        },
+    );
+    let rows = frame_rows(&state.compose(120, 30).expect("frame")).join("\n");
+    assert!(rows.contains("Notes exited"), "{rows}");
+    assert!(!rows.contains("starting"));
 }

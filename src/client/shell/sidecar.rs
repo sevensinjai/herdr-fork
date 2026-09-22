@@ -27,8 +27,7 @@ impl ClientShellState {
             return;
         }
         let shown_tab = self.sidecar.map(|sidecar| sidecar.tab);
-        self.sidecar_surface =
-            (surface.frame.is_some() && shown_tab == Some(surface.tab)).then_some(surface);
+        self.sidecar_surface = (shown_tab == Some(surface.tab)).then_some(surface);
     }
 
     /// The server can no longer host the Sidecar (older server or reconnect).
@@ -286,14 +285,30 @@ pub(super) fn compose_sidecar(
         );
         hits.sidecar_close = Some(close);
     }
-    let shown = surface.filter(|surface| surface.tab == ui.tab);
+    let shown = surface.filter(|surface| surface.tab == ui.tab && surface.frame.is_some());
     if shown.is_none() {
-        composed.set_string(
-            geometry.inner.x + 1,
-            geometry.inner.y,
-            "starting…",
-            ratatui::style::Style::default().fg(palette.text),
-        );
+        let exited = surface.is_some_and(|surface| surface.tab == ui.tab && surface.exited);
+        let lines: &[&str] = match (exited, ui.tab) {
+            (false, _) => &["starting…"],
+            (true, SidecarTab::Notes) => &[
+                "Notes exited.",
+                "Check [sidecar] notes_command,",
+                "then reopen the Sidecar.",
+            ],
+            (true, SidecarTab::Chat) => &[
+                "Chat exited.",
+                "Check [sidecar] chat_command,",
+                "then reopen the Sidecar.",
+            ],
+        };
+        for (row, line) in lines.iter().enumerate() {
+            composed.set_string(
+                geometry.inner.x + 1,
+                geometry.inner.y + row as u16,
+                line,
+                ratatui::style::Style::default().fg(palette.text),
+            );
+        }
     }
     frame.replace_from_ratatui_buffer_preserving_effects(&composed, None);
     hits.sidecar_panel = Some(geometry.outer);

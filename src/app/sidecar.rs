@@ -40,6 +40,9 @@ pub(crate) struct SidecarState {
     pub notes: Option<SidecarSlot>,
     pub chat: Option<SidecarSlot>,
     pub pending_chat: Option<PendingChat>,
+    /// Tabs whose command exited and has not been started again.
+    notes_exited: bool,
+    chat_exited: bool,
 }
 
 impl SidecarState {
@@ -47,6 +50,20 @@ impl SidecarState {
         match tab {
             SidecarTab::Notes => self.notes.as_ref(),
             SidecarTab::Chat => self.chat.as_ref(),
+        }
+    }
+
+    pub(crate) fn exited(&self, tab: SidecarTab) -> bool {
+        match tab {
+            SidecarTab::Notes => self.notes_exited,
+            SidecarTab::Chat => self.chat_exited,
+        }
+    }
+
+    fn set_exited(&mut self, tab: SidecarTab, exited: bool) {
+        match tab {
+            SidecarTab::Notes => self.notes_exited = exited,
+            SidecarTab::Chat => self.chat_exited = exited,
         }
     }
 
@@ -184,6 +201,7 @@ impl App {
         if tab == SidecarTab::Chat {
             self.state.sidecar.pending_chat = None;
         }
+        self.state.sidecar.set_exited(tab, true);
         self.render_dirty.request_generic();
         self.render_notify.notify_one();
         true
@@ -253,6 +271,7 @@ impl App {
             pane_id,
             terminal_id,
         });
+        self.state.sidecar.set_exited(tab, false);
         self.render_dirty.request_generic();
         self.render_notify.notify_one();
     }
@@ -421,6 +440,13 @@ mod tests {
 
         assert!(app.handle_sidecar_pane_died(notes.pane_id));
         assert!(app.state.sidecar.notes.is_none());
+        assert!(app.state.sidecar.exited(SidecarTab::Notes));
+        assert!(!app.state.sidecar.exited(SidecarTab::Chat));
+        let (_again, _rx) = install(&mut app, SidecarTab::Notes);
+        assert!(
+            !app.state.sidecar.exited(SidecarTab::Notes),
+            "a new start clears it"
+        );
         assert!(!app.state.terminals.contains_key(&notes.terminal_id));
         assert_eq!(app.state.sidecar.chat, Some(chat));
         assert!(!app.handle_sidecar_pane_died(PaneId::alloc()));

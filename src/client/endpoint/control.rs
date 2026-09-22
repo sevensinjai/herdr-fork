@@ -83,6 +83,7 @@ mod tests {
             terminal_id: Some("t1".into()),
             frame: None,
             mouse_reporting: true,
+            exited: false,
         };
         let data = serde_json::to_string(&control).unwrap();
         assert!(matches!(

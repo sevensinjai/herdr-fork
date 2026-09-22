@@ -43,6 +43,7 @@ impl HeadlessServer {
                 terminal_id: None,
                 frame: None,
                 mouse_reporting: false,
+                exited: false,
             }),
             _ => None,
         };
@@ -65,8 +66,7 @@ impl HeadlessServer {
             return Err(());
         };
         writer.control.send(framed).map_err(|_| ())?;
-        // A closed surface is sent once; afterwards the client has nothing to draw.
-        client.shell_sidecar_sent = next.frame.is_some().then_some(next);
+        client.shell_sidecar_sent = Some(next);
         Ok(())
     }
 }
@@ -104,6 +104,7 @@ fn sidecar_surface(app: &crate::app::App, view: SidecarViewControl) -> SidecarSu
         terminal_id: None,
         frame: None,
         mouse_reporting: false,
+        exited: app.state.sidecar.exited(view.tab),
     };
     let Some(slot) = app.state.sidecar.slot(view.tab) else {
         return closed;
@@ -123,5 +124,6 @@ fn sidecar_surface(app: &crate::app::App, view: SidecarViewControl) -> SidecarSu
             &hyperlinks,
         )),
         mouse_reporting: runtime.mouse_reporting_enabled(),
+        exited: false,
     }
 }

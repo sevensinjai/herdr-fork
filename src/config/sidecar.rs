@@ -20,7 +20,7 @@ impl Default for SidecarConfig {
     fn default() -> Self {
         Self {
             width: PopupSize::Percent(35),
-            notes_command: "${EDITOR:-nvim} \"$HERDR_SIDECAR_NOTES\"".to_string(),
+            notes_command: "${EDITOR:-vi} \"$HERDR_SIDECAR_NOTES\"".to_string(),
             chat_command: "claude".to_string(),
         }
     }
@@ -46,7 +46,7 @@ mod tests {
         assert_eq!(config.sidecar.width, PopupSize::Percent(35));
         assert_eq!(
             config.sidecar.notes_command,
-            "${EDITOR:-nvim} \"$HERDR_SIDECAR_NOTES\""
+            "${EDITOR:-vi} \"$HERDR_SIDECAR_NOTES\""
         );
         assert_eq!(config.sidecar.chat_command, "claude");
     }
