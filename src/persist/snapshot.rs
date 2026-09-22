@@ -109,6 +109,9 @@ pub struct PaneSnapshot {
     pub agent_session: Option<PaneAgentSessionSnapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub launch_argv: Option<Vec<String>>,
+    /// Pane metadata tokens set without a TTL (e.g. an Agents panel stage).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub tokens: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -329,6 +332,9 @@ fn capture_tab(
             .or_else(|| terminal.map(|terminal| terminal.cwd.clone()))
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| "/".into()));
         let label = terminal.and_then(|terminal| terminal.manual_label.clone());
+        let tokens = terminal
+            .map(|terminal| terminal.metadata_tokens.persistent_values())
+            .unwrap_or_default();
         let (agent_name, managed_agent_kind) = terminal
             .filter(|terminal| !terminal.managed_agent_launch_pending())
             .map(|terminal| {
@@ -371,6 +377,7 @@ fn capture_tab(
                 managed_agent_kind,
                 agent_session,
                 launch_argv,
+                tokens,
             },
         );
     }
@@ -578,6 +585,49 @@ mod tests {
     }
 
     #[test]
+    fn pane_snapshot_keeps_tokens_without_ttl_and_old_files_still_load() {
+        let mut state = state_with_workspaces(&["tokens"]);
+        let root = state.workspaces[0].tabs[0].root_pane;
+        let terminal_id = state.workspaces[0].tabs[0].panes[&root]
+            .attached_terminal_id
+            .clone();
+        let now = std::time::Instant::now();
+        let terminal = state.terminals.get_mut(&terminal_id).unwrap();
+        terminal.metadata_tokens.patch(
+            std::collections::HashMap::from([("stage".to_string(), Some("working".to_string()))]),
+            None,
+            now,
+        );
+        terminal.metadata_tokens.patch(
+            std::collections::HashMap::from([("summary".to_string(), Some("x".to_string()))]),
+            Some(std::time::Duration::from_secs(5)),
+            now,
+        );
+
+        let snapshot = capture_from_state(&state);
+        let pane = &snapshot.workspaces[0].tabs[0].panes[&root.raw()];
+        assert_eq!(
+            pane.tokens,
+            std::collections::BTreeMap::from([("stage".to_string(), "working".to_string())])
+        );
+        let json = serde_json::to_string(&snapshot).unwrap();
+        let reparsed = parse_snapshot(&json).unwrap();
+        assert_eq!(
+            reparsed.workspaces[0].tabs[0].panes[&root.raw()].tokens,
+            pane.tokens
+        );
+
+        let legacy = parse_snapshot(include_str!(
+            "../../tests/fixtures/session/current-herdr-session.json"
+        ))
+        .unwrap();
+        assert!(legacy.workspaces[0].tabs[0]
+            .panes
+            .values()
+            .all(|pane| pane.tokens.is_empty()));
+    }
+
+    #[test]
     fn managed_agent_snapshot_omits_pending_and_persists_active_ownership() {
         let mut state = state_with_workspaces(&["managed-snapshot"]);
         let root = state.workspaces[0].tabs[0].root_pane;
@@ -689,6 +739,7 @@ mod tests {
                 managed_agent_kind: None,
                 agent_session: None,
                 launch_argv: None,
+                tokens: Default::default(),
             },
         );
         panes.insert(
@@ -700,6 +751,7 @@ mod tests {
                 managed_agent_kind: None,
                 agent_session: None,
                 launch_argv: None,
+                tokens: Default::default(),
             },
         );
 
@@ -1351,6 +1403,7 @@ mod tests {
                 managed_agent_kind: None,
                 agent_session: None,
                 launch_argv: None,
+                tokens: Default::default(),
             },
         );
         panes.insert(
@@ -1364,6 +1417,7 @@ mod tests {
                 managed_agent_kind: None,
                 agent_session: None,
                 launch_argv: None,
+                tokens: Default::default(),
             },
         );
 

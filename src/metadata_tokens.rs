@@ -88,6 +88,33 @@ impl MetadataTokens {
             .collect()
     }
 
+    /// Tokens set without a TTL, which survive a session restart. TTL tokens
+    /// are ephemeral by intent and are never persisted.
+    pub(crate) fn persistent_values(&self) -> std::collections::BTreeMap<String, String> {
+        self.entries
+            .iter()
+            .filter(|(_, token)| token.expires_at.is_none())
+            .map(|(key, token)| (key.clone(), token.value.clone()))
+            .collect()
+    }
+
+    pub(crate) fn from_persistent(values: std::collections::BTreeMap<String, String>) -> Self {
+        Self {
+            entries: values
+                .into_iter()
+                .map(|(key, value)| {
+                    (
+                        key,
+                        MetadataToken {
+                            value,
+                            expires_at: None,
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
+
     pub(crate) fn next_expiry(&self) -> Option<Instant> {
         self.entries
             .values()
@@ -106,6 +133,30 @@ impl MetadataTokens {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_tokens_without_ttl_are_persistent_and_they_restore() {
+        let now = Instant::now();
+        let mut tokens = MetadataTokens::default();
+        tokens.patch(patch(&[("stage", Some("verifying"))]), None, now);
+        tokens.patch(
+            patch(&[("summary", Some("busy"))]),
+            Some(Duration::from_secs(60)),
+            now,
+        );
+        let persistent = tokens.persistent_values();
+        assert_eq!(
+            persistent,
+            std::collections::BTreeMap::from([("stage".to_string(), "verifying".to_string())])
+        );
+
+        let restored = MetadataTokens::from_persistent(persistent);
+        assert_eq!(
+            restored.values().get("stage").map(String::as_str),
+            Some("verifying")
+        );
+        assert_eq!(restored.next_expiry(), None);
+    }
 
     fn patch(items: &[(&str, Option<&str>)]) -> HashMap<String, Option<String>> {
         items

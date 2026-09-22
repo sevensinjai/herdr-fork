@@ -1741,6 +1741,11 @@ impl App {
                 );
             }
         }
+        // Tokens without a TTL are saved with the session; clearing any key
+        // may remove a saved one.
+        let persistent_change = tokens
+            .as_ref()
+            .is_some_and(|tokens| ttl.is_none() || tokens.values().any(Option::is_none));
         let token_changed = tokens.is_some_and(|tokens| {
             let changed = terminal
                 .metadata_tokens
@@ -1768,6 +1773,9 @@ impl App {
             });
         }
         if token_changed {
+            if persistent_change {
+                self.state.mark_session_dirty();
+            }
             self.sync_agent_metadata_deadline();
             self.emit_pane_updated(ws_idx, pane_id);
         }
@@ -4493,6 +4501,24 @@ mod tests {
                 .map(String::as_str),
             Some("new")
         );
+    }
+
+    #[test]
+    fn persistent_token_changes_schedule_a_session_save() {
+        let (mut app, pane_id) = app_with_test_workspace();
+        app.state.session_dirty = false;
+        let mut params = metadata_params(pane_id.clone());
+        params.tokens =
+            std::collections::HashMap::from([("stage".to_string(), Some("working".to_string()))]);
+        params.ttl_ms = Some(1_000);
+        app.handle_pane_report_metadata("ttl".into(), params);
+        assert!(!app.state.session_dirty, "ttl tokens are not persisted");
+
+        let mut params = metadata_params(pane_id);
+        params.tokens =
+            std::collections::HashMap::from([("stage".to_string(), Some("verifying".to_string()))]);
+        app.handle_pane_report_metadata("keep".into(), params);
+        assert!(app.state.session_dirty);
     }
 
     #[test]

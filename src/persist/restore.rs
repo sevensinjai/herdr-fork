@@ -451,6 +451,8 @@ fn unavailable_restored_terminal(
     terminal.restore_error = Some(reason);
     if let Some(pane) = pane {
         terminal.manual_label = pane.label.clone();
+        terminal.metadata_tokens =
+            crate::metadata_tokens::MetadataTokens::from_persistent(pane.tokens.clone());
         terminal.launch_argv = pane.launch_argv.clone();
         if let Some(session) = restored_terminal_agent_session(pane.agent_session.as_ref(), false) {
             terminal.set_persisted_agent_session(session);
@@ -524,6 +526,11 @@ fn restore_tab(
         }
 
         let saved_label = saved_pane.and_then(|p| p.label.clone());
+        let saved_tokens = saved_pane
+            .map(|pane| {
+                crate::metadata_tokens::MetadataTokens::from_persistent(pane.tokens.clone())
+            })
+            .unwrap_or_default();
         let saved_agent_name = saved_pane.and_then(|p| p.agent_name.clone());
         let saved_managed_agent = saved_pane
             .and_then(|pane| pane.managed_agent_kind.as_deref())
@@ -573,6 +580,7 @@ fn restore_tab(
             if let Some(label) = saved_label {
                 terminal.set_manual_label(label);
             }
+            terminal.metadata_tokens = saved_tokens;
             if let Some(session) = restored_agent_session {
                 terminal.set_persisted_agent_session(session);
             }
@@ -670,6 +678,7 @@ fn restore_tab(
                 if let Some(label) = saved_label {
                     terminal.set_manual_label(label);
                 }
+                terminal.metadata_tokens = saved_tokens;
                 if let Some(session) = restored_agent_session {
                     terminal.set_persisted_agent_session(session);
                 }
@@ -1294,6 +1303,85 @@ mod tests {
         }
     }
 
+    fn single_pane_snapshot_with_tokens(cwd: PathBuf) -> SessionSnapshot {
+        SessionSnapshot {
+            version: super::super::snapshot::SNAPSHOT_VERSION,
+            workspaces: vec![WorkspaceSnapshot {
+                id: Some("workspace".into()),
+                custom_name: None,
+                identity_cwd: cwd.clone(),
+                worktree_space: None,
+                public_pane_numbers: HashMap::new(),
+                next_public_pane_number: 0,
+                public_tab_numbers: Vec::new(),
+                next_public_tab_number: 0,
+                tabs: vec![TabSnapshot {
+                    custom_name: None,
+                    layout: LayoutSnapshot::Pane(0),
+                    panes: HashMap::from([(
+                        0,
+                        super::super::snapshot::PaneSnapshot {
+                            cwd,
+                            label: None,
+                            agent_name: None,
+                            managed_agent_kind: None,
+                            agent_session: None,
+                            launch_argv: None,
+                            tokens: std::collections::BTreeMap::from([(
+                                "stage".to_string(),
+                                "pending QA".to_string(),
+                            )]),
+                        },
+                    )]),
+                    zoomed: false,
+                    focused: Some(0),
+                    root_pane: Some(0),
+                }],
+                active_tab: 0,
+            }],
+            active: Some(0),
+            selected: 0,
+            sidebar_width: None,
+            sidebar_section_split: None,
+            collapsed_space_keys: Default::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn restore_brings_back_pane_tokens_on_live_and_unavailable_panes() {
+        for cwd in [
+            std::env::current_dir().unwrap(),
+            PathBuf::from("/definitely/missing/herdr-token-restore"),
+        ] {
+            let snapshot = single_pane_snapshot_with_tokens(cwd.clone());
+            let (events, _event_rx) = mpsc::channel(4);
+            let (_workspaces, terminals, _runtimes) = restore(
+                &snapshot,
+                None,
+                24,
+                80,
+                0,
+                test_restore_shell(),
+                crate::config::ShellModeConfig::NonLogin,
+                false,
+                events,
+                Arc::new(Notify::new()),
+                Arc::new(RenderSignal::new()),
+            );
+            let terminal = terminals.values().next().expect("restored terminal");
+            assert_eq!(
+                terminal
+                    .metadata_tokens
+                    .values()
+                    .get("stage")
+                    .map(String::as_str),
+                Some("pending QA"),
+                "cwd {}",
+                cwd.display()
+            );
+        }
+    }
+
     #[tokio::test]
     async fn restore_carries_persisted_agent_session_metadata() {
         let cwd = std::env::current_dir().unwrap();
@@ -1325,6 +1413,7 @@ mod tests {
                                 value: "opencode-session".into(),
                             }),
                             launch_argv: None,
+                            tokens: Default::default(),
                         },
                     )]),
                     zoomed: false,
@@ -1406,6 +1495,7 @@ mod tests {
                                 managed_agent_kind: None,
                                 agent_session: None,
                                 launch_argv: None,
+                                tokens: Default::default(),
                             },
                         ),
                         (
@@ -1417,6 +1507,7 @@ mod tests {
                                 managed_agent_kind: None,
                                 agent_session: None,
                                 launch_argv: None,
+                                tokens: Default::default(),
                             },
                         ),
                     ]),
@@ -1470,6 +1561,7 @@ mod tests {
                     managed_agent_kind: None,
                     agent_session: None,
                     launch_argv: None,
+                    tokens: Default::default(),
                 },
             )
         };
@@ -1485,6 +1577,7 @@ mod tests {
                 value: "codex-session".into(),
             }),
             launch_argv: None,
+            tokens: Default::default(),
         };
         let snapshot = SessionSnapshot {
             version: super::super::snapshot::SNAPSHOT_VERSION,
@@ -1636,6 +1729,7 @@ mod tests {
                                 value: "codex-session".into(),
                             }),
                             launch_argv: None,
+                            tokens: Default::default(),
                         },
                     )]),
                     zoomed: false,
@@ -1839,6 +1933,7 @@ mod tests {
                 managed_agent_kind: None,
                 agent_session: None,
                 launch_argv: None,
+                tokens: Default::default(),
             },
         );
         let mut history = SessionHistorySnapshot {
