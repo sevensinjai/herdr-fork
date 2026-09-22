@@ -62,10 +62,6 @@ fn fast_path_blocker(
         Some("client_surface_patch.fallback.mode")
     } else if state.overlay.is_some() {
         Some("client_surface_patch.fallback.overlay")
-    } else if state.sidecar.is_some() {
-        // Patched rows are written straight to the screen; the Sidecar floats
-        // over panes and must be recomposed on top.
-        Some("client_surface_patch.fallback.sidecar")
     } else if state.endpoint_error.is_some() {
         Some("client_surface_patch.fallback.endpoint_error")
     } else if state.config_diagnostic.is_some() {

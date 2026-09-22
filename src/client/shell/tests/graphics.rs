@@ -294,7 +294,6 @@ fn every_dialog_and_menu_occludes_its_panel_not_the_whole_screen() {
                 state.hits.global_launcher,
                 menu,
                 snapshot,
-                state.sidecar_menu_state(),
                 &state.config.palette,
             ),
             _ => render::render_client_overlay(

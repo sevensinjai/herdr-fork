@@ -503,8 +503,6 @@ pub(crate) enum ServerEvent {
     ClientShellMouseCapture { client_id: u64, enabled: bool },
     /// The committed shell asks the server to replay presentation effects before input resumes.
     ClientShellPresentationSync { client_id: u64, token: String },
-    /// A client's Sidecar view (`endpoint.sidecar-view.v1` JSON).
-    ClientShellSidecarView { client_id: u64, data: String },
     /// A client-owned shell invoked one endpoint operation through this connection.
     ClientShellEndpointRequest {
         client_id: u64,
@@ -1317,11 +1315,6 @@ fn client_read_loop_with_endpoint_controls(
                         message,
                     },
                 }
-            }
-            ClientMessage::EndpointControl { kind, data }
-                if kind == crate::protocol::endpoint::SIDECAR_VIEW_KIND =>
-            {
-                ServerEvent::ClientShellSidecarView { client_id, data }
             }
             ClientMessage::EndpointControl { kind, data }
                 if kind == crate::protocol::endpoint::PRESENTATION_EFFECTS_SYNC_KIND =>

@@ -1,6 +1,5 @@
 use std::{collections::BTreeSet, num::NonZeroUsize};
 
-use super::sidecar::SidecarConfig;
 use crossterm::event::KeyModifiers;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
@@ -321,7 +320,6 @@ pub struct Config {
     pub advanced: AdvancedConfig,
     pub experimental: ExperimentalConfig,
     pub remote: RemoteConfig,
-    pub sidecar: SidecarConfig,
 }
 
 #[derive(Debug)]
@@ -441,12 +439,6 @@ pub struct KeysConfig {
     /// Toggle zoom for the focused pane. Default: "prefix+z"
     #[serde(alias = "fullscreen")]
     pub zoom: BindingConfig,
-    /// Show or hide the Sidecar panel. Default: "prefix+shift+s"
-    pub sidecar_toggle: BindingConfig,
-    /// Switch the Sidecar between Notes and Chat. Default: "prefix+shift+o"
-    pub sidecar_switch_tab: BindingConfig,
-    /// Send the current pane selection to the Sidecar. Default: "prefix+shift+y"
-    pub sidecar_send_selection: BindingConfig,
     /// Enter resize mode. Default: "prefix+r"
     pub resize_mode: BindingConfig,
     /// Resize the focused pane toward the left. Unset by default.
@@ -579,12 +571,6 @@ pub(crate) struct KeysConfigOverlay {
     #[serde(alias = "fullscreen", skip_serializing_if = "Option::is_none")]
     zoom: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    sidecar_toggle: Option<BindingConfig>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    sidecar_switch_tab: Option<BindingConfig>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    sidecar_send_selection: Option<BindingConfig>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     resize_mode: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     resize_pane_left: Option<BindingConfig>,
@@ -679,9 +665,6 @@ impl<'de> Deserialize<'de> for KeysConfig {
         apply_field!(split_horizontal);
         apply_field!(close_pane);
         apply_field!(zoom);
-        apply_field!(sidecar_toggle);
-        apply_field!(sidecar_switch_tab);
-        apply_field!(sidecar_send_selection);
         apply_field!(resize_mode);
         apply_field!(resize_pane_left);
         apply_field!(resize_pane_down);
@@ -787,9 +770,6 @@ impl KeysConfig {
         copy_effective_action_field!(split_horizontal, keybinds.split_horizontal);
         copy_effective_action_field!(close_pane, keybinds.close_pane);
         copy_effective_action_field!(zoom, keybinds.zoom);
-        copy_effective_action_field!(sidecar_toggle, keybinds.sidecar_toggle);
-        copy_effective_action_field!(sidecar_switch_tab, keybinds.sidecar_switch_tab);
-        copy_effective_action_field!(sidecar_send_selection, keybinds.sidecar_send_selection);
         copy_effective_action_field!(resize_mode, keybinds.resize_mode);
         copy_effective_action_field!(resize_pane_left, keybinds.resize_pane_left);
         copy_effective_action_field!(resize_pane_down, keybinds.resize_pane_down);
@@ -1159,9 +1139,6 @@ impl Default for KeysConfig {
             split_horizontal: BindingConfig::one("prefix+minus"),
             close_pane: BindingConfig::one("prefix+x"),
             zoom: BindingConfig::one("prefix+z"),
-            sidecar_toggle: BindingConfig::one("prefix+shift+s"),
-            sidecar_switch_tab: BindingConfig::one("prefix+shift+o"),
-            sidecar_send_selection: BindingConfig::one("prefix+shift+y"),
             resize_mode: BindingConfig::one("prefix+r"),
             resize_pane_left: BindingConfig::empty(),
             resize_pane_down: BindingConfig::empty(),

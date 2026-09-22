@@ -3965,42 +3965,6 @@
           },
           "type": "object"
         },
-        "SidecarSendParams": {
-          "description": "`sidecar.send`: deliver text to a tab. A running terminal receives it as a\npaste; a stopped Notes tab gets it appended to the notes file; a stopped\nChat tab is started and receives it once ready. At most 64 KiB.",
-          "properties": {
-            "tab": {
-              "$ref": "#/schemas/request/$defs/SidecarTab"
-            },
-            "text": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "tab",
-            "text"
-          ],
-          "type": "object"
-        },
-        "SidecarShowParams": {
-          "description": "`sidecar.show`: start the tab's terminal if needed.",
-          "properties": {
-            "tab": {
-              "$ref": "#/schemas/request/$defs/SidecarTab"
-            }
-          },
-          "required": [
-            "tab"
-          ],
-          "type": "object"
-        },
-        "SidecarTab": {
-          "description": "The two terminals the Sidecar panel hosts.",
-          "enum": [
-            "notes",
-            "chat"
-          ],
-          "type": "string"
-        },
         "SplitDirection": {
           "enum": [
             "right",
@@ -6173,38 +6137,6 @@
             },
             "params": {
               "$ref": "#/schemas/request/$defs/EmptyParams"
-            }
-          },
-          "required": [
-            "method",
-            "params"
-          ],
-          "type": "object"
-        },
-        {
-          "properties": {
-            "method": {
-              "const": "sidecar.show",
-              "type": "string"
-            },
-            "params": {
-              "$ref": "#/schemas/request/$defs/SidecarShowParams"
-            }
-          },
-          "required": [
-            "method",
-            "params"
-          ],
-          "type": "object"
-        },
-        {
-          "properties": {
-            "method": {
-              "const": "sidecar.send",
-              "type": "string"
-            },
-            "params": {
-              "$ref": "#/schemas/request/$defs/SidecarSendParams"
             }
           },
           "required": [
@@ -10666,23 +10598,6 @@
                 "type",
                 "active",
                 "projection_revision"
-              ],
-              "type": "object"
-            },
-            {
-              "description": "`sidecar.show`: the tab's running terminal.",
-              "properties": {
-                "terminal_id": {
-                  "type": "string"
-                },
-                "type": {
-                  "const": "sidecar_shown",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "terminal_id"
               ],
               "type": "object"
             },

@@ -364,9 +364,6 @@ pub struct Keybinds {
     pub split_horizontal: ActionKeybinds,
     pub close_pane: ActionKeybinds,
     pub zoom: ActionKeybinds,
-    pub sidecar_toggle: ActionKeybinds,
-    pub sidecar_switch_tab: ActionKeybinds,
-    pub sidecar_send_selection: ActionKeybinds,
     pub resize_mode: ActionKeybinds,
     pub resize_pane_left: ActionKeybinds,
     pub resize_pane_down: ActionKeybinds,
@@ -536,9 +533,6 @@ impl Config {
             split_horizontal: empty_action!(),
             close_pane: empty_action!(),
             zoom: empty_action!(),
-            sidecar_toggle: empty_action!(),
-            sidecar_switch_tab: empty_action!(),
-            sidecar_send_selection: empty_action!(),
             resize_mode: empty_action!(),
             resize_pane_left: empty_action!(),
             resize_pane_down: empty_action!(),
@@ -687,13 +681,6 @@ impl Config {
             apply_action!(keybinds.split_horizontal, split_horizontal, source);
             apply_action!(keybinds.close_pane, close_pane, source);
             apply_action!(keybinds.zoom, zoom, source);
-            apply_action!(keybinds.sidecar_toggle, sidecar_toggle, source);
-            apply_action!(keybinds.sidecar_switch_tab, sidecar_switch_tab, source);
-            apply_action!(
-                keybinds.sidecar_send_selection,
-                sidecar_send_selection,
-                source
-            );
             apply_action!(keybinds.resize_mode, resize_mode, source);
             apply_action!(keybinds.resize_pane_left, resize_pane_left, source);
             apply_action!(keybinds.resize_pane_down, resize_pane_down, source);

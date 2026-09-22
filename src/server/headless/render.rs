@@ -374,10 +374,6 @@ impl HeadlessServer {
 
     pub(super) fn render_and_stream(&mut self) {
         let full_started = crate::render_prof::timer();
-        // O(1) unless Chat text is queued; runs even with no render targets so
-        // a queued paste is not stranded while every client is detached.
-        self.app
-            .flush_pending_sidecar_chat(std::time::Instant::now());
         let render_targets = render_targets(&self.clients, self.foreground_client_id);
 
         if render_targets.is_empty() {
@@ -571,12 +567,6 @@ impl HeadlessServer {
                     client.clear_deferred_render();
                     continue;
                 }
-            }
-            if matches!(mode, ClientConnectionMode::ClientShell)
-                && self.stream_client_sidecar(client_id).is_err()
-            {
-                broken_clients.push(client_id);
-                continue;
             }
             let shell_graphics_delivery = self
                 .clients

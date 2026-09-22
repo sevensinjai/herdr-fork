@@ -30,7 +30,6 @@ mod preferences;
 mod render;
 mod scroll;
 mod settings;
-mod sidecar;
 mod state;
 mod surface_patch;
 mod text_editor;
@@ -243,7 +242,7 @@ fn panel_contrast_fg(palette: &Palette) -> ratatui::style::Color {
     }
 }
 
-pub(super) fn blit_pane_surface(target: &mut FrameData, source: &FrameData, area: Rect) {
+fn blit_pane_surface(target: &mut FrameData, source: &FrameData, area: Rect) {
     let copy_width = source.width.min(area.width);
     let copy_height = source.height.min(area.height);
     let hyperlink_base = target.hyperlinks.len() as u32;

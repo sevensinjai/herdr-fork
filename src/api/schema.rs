@@ -10,7 +10,6 @@ pub mod plugins;
 pub mod response;
 pub mod server;
 pub mod session;
-pub mod sidecar;
 pub mod tabs;
 pub mod workspaces;
 pub mod worktrees;
@@ -25,7 +24,6 @@ pub use plugins::*;
 pub use response::*;
 pub use server::*;
 pub use session::*;
-pub use sidecar::*;
 pub use tabs::*;
 pub use workspaces::*;
 pub use worktrees::*;
@@ -236,10 +234,6 @@ pub enum Method {
     PaneClose(PaneTarget),
     #[serde(rename = "popup.close")]
     PopupClose(EmptyParams),
-    #[serde(rename = "sidecar.show")]
-    SidecarShow(SidecarShowParams),
-    #[serde(rename = "sidecar.send")]
-    SidecarSend(SidecarSendParams),
     #[serde(rename = "events.subscribe")]
     EventsSubscribe(EventsSubscribeParams),
     #[serde(rename = "events.wait")]

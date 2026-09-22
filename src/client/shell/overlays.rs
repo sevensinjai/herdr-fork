@@ -88,10 +88,9 @@ pub(crate) fn render_global_menu(
     launcher: Rect,
     menu: &ClientGlobalMenuOverlay,
     snapshot: &ClientShellSnapshot,
-    sidecar: Option<bool>,
     palette: &Palette,
 ) -> Option<OverlayRender> {
-    let items = super::super::global_menu::global_menu_items(snapshot, sidecar);
+    let items = super::super::global_menu::global_menu_items(snapshot);
     let screen = buffer.area;
     let width = items
         .iter()

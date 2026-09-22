@@ -800,24 +800,6 @@
           "description": "Toggle zoom for the focused pane. The legacy key name `fullscreen` is accepted as an alias."
         },
         {
-          "key": "keys.sidecar_toggle",
-          "type": "keybinding",
-          "default": "\"prefix+shift+s\"",
-          "description": "Show or hide the Sidecar panel. Opening it also focuses it."
-        },
-        {
-          "key": "keys.sidecar_switch_tab",
-          "type": "keybinding",
-          "default": "\"prefix+shift+o\"",
-          "description": "Switch the Sidecar between Notes and Chat."
-        },
-        {
-          "key": "keys.sidecar_send_selection",
-          "type": "keybinding",
-          "default": "\"prefix+shift+y\"",
-          "description": "Send the current pane selection to the Sidecar tab in use, Notes by default."
-        },
-        {
           "key": "keys.resize_mode",
           "type": "keybinding",
           "default": "\"prefix+r\"",
@@ -1471,30 +1453,6 @@
           "type": "string",
           "default": "\"~/.herdr/worktrees\"",
           "description": "Root directory under which Herdr creates <repo>/<branch-slug> checkouts."
-        }
-      ]
-    },
-    {
-      "id": "sidecar",
-      "title": "Sidecar",
-      "keys": [
-        {
-          "key": "sidecar.width",
-          "type": "cells or percentage",
-          "default": "\"35%\"",
-          "description": "Width of the right-docked Sidecar panel, as cells or a percentage of the pane area. At least 30 columns."
-        },
-        {
-          "key": "sidecar.notes_command",
-          "type": "string",
-          "default": "'command -v nano >/dev/null && exec nano \"$HERDR_SIDECAR_NOTES\"; exec ${EDITOR:-vi} \"$HERDR_SIDECAR_NOTES\"'",
-          "description": "Shell command for the Notes tab. $HERDR_SIDECAR_NOTES is the per-session notes file, ~/.config/herdr/sidecar/<session>.md."
-        },
-        {
-          "key": "sidecar.chat_command",
-          "type": "string",
-          "default": "\"claude\"",
-          "description": "Shell command for the Chat tab, a scratch agent that keeps running while the Sidecar is hidden."
         }
       ]
     },

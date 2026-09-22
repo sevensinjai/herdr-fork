@@ -492,8 +492,6 @@ pub(crate) fn api_method_name(method: &Method) -> &'static str {
         Method::PaneReleaseAgent(_) => "pane.release_agent",
         Method::PaneClose(_) => "pane.close",
         Method::PopupClose(_) => "popup.close",
-        Method::SidecarShow(_) => "sidecar.show",
-        Method::SidecarSend(_) => "sidecar.send",
         Method::EventsSubscribe(_) => "events.subscribe",
         Method::EventsWait(_) => "events.wait",
         Method::PaneWaitForOutput(_) => "pane.wait_for_output",

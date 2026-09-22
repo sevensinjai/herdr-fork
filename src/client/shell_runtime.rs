@@ -743,15 +743,7 @@ pub(super) fn finish_client_shell_input(
         .as_ref()
         .is_none_or(|shell| shell.endpoint_is_online(endpoints.active_id()))
         && endpoints.active_surface_available();
-    let mut requests = outcome.requests;
-    if let Some(view) = state
-        .shell
-        .as_mut()
-        .and_then(shell::ClientShellState::take_sidecar_view_message)
-    {
-        requests.push(view);
-    }
-    for request in requests {
+    for request in outcome.requests {
         if let ClientMessage::ClientShellHostTheme { update } = &request {
             state.record_host_theme_update(update);
             if let Some(activation) = pending_activation.as_mut() {

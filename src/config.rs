@@ -4,7 +4,6 @@ mod io;
 mod keybinds;
 mod model;
 mod sidebar;
-mod sidecar;
 mod sound;
 mod tab_bar;
 mod theme;
@@ -33,7 +32,6 @@ pub use self::{
         AgentSidebarToken, AgentsSidebarConfig, SidebarConfig, SidebarTokenStyle,
         SpaceSidebarToken, SpacesSidebarConfig,
     },
-    sidecar::SidecarConfig,
     sound::SoundConfig,
     tab_bar::TabBarRightEntryConfig,
     theme::{parse_color, CustomThemeColors, ModeThemeColors, ThemeConfig, THEME_NAMES},

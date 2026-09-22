@@ -534,7 +534,6 @@ impl ClientShellState {
                 | PendingEndpointKind::IntegrationList
                 | PendingEndpointKind::IntegrationInstall
                 | PendingEndpointKind::SelectionCopy
-                | PendingEndpointKind::SendToSidecar { .. }
                 | PendingEndpointKind::PaneScroll { .. }
                 | PendingEndpointKind::WordSelection { .. }
                 | PendingEndpointKind::PaneLinkActivate { .. }

@@ -543,19 +543,6 @@ impl ClientShellState {
             ));
             frame.replace_from_ratatui_buffer_preserving_effects(&composed, cursor);
         }
-        if let Some(view) = super::sidecar::compose_sidecar(
-            self.sidecar,
-            self.sidecar_tab,
-            self.sidecar_surface.as_ref(),
-            self.sidecar_view_sent,
-            &self.config,
-            &mut self.hits,
-            &mut frame,
-            layout.pane_surface,
-            &mut occlusion,
-        )? {
-            self.sidecar_view_pending = Some(view);
-        }
         self.hits.popup = None;
         if let Some(popup) = surface.popup.as_deref() {
             let width = popup.width.map(client_popup_size);
@@ -654,7 +641,6 @@ impl ClientShellState {
                     self.hits.global_launcher,
                     menu,
                     snapshot,
-                    self.sidecar_menu_state(),
                     &self.config.palette,
                 )?;
                 occlusion.cover(rendered.area);

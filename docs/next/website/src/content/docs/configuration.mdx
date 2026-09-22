@@ -93,41 +93,6 @@ new_cwd = "follow"
 
 `new_cwd = "follow"` keeps the default behavior and inherits the source pane or workspace. When there is no source workspace, Herdr starts in `$HOME`. Use `"home"` to always start in `$HOME`, `"current"` to use Herdr's process directory, or a fixed path such as `"~/Projects"`. Explicit `--cwd` values from the CLI or socket API still take precedence.
 
-## Sidecar
-
-The Sidecar is a panel that slides in from the right edge over your panes. It
-holds two terminals that keep running while it is hidden:
-
-- **Notes** opens `nano` on a notes file for the current session, so you can
-  type right away. Save with `ctrl+o`. Without `nano`, it uses `$EDITOR`, then
-  `vi`. The file is `~/.config/herdr/sidecar/<session>.md`. Each named session
-  (`herdr --session work`) has its own file, and `herdr session delete` leaves
-  it in place.
-- **Chat** runs a scratch agent, `claude` by default.
-
-```toml
-[sidecar]
-width = "35%"
-notes_command = 'command -v nano >/dev/null && exec nano "$HERDR_SIDECAR_NOTES"; exec ${EDITOR:-vi} "$HERDR_SIDECAR_NOTES"'
-chat_command = "claude"
-```
-
-`width` accepts cells or a percentage of the pane area. The panel is at least 30
-columns wide and always leaves 10 columns of panes visible. A command starts the
-first time its tab is shown, in the focused pane's directory. If it exits, the
-panel says so, and the next show starts it again.
-
-`prefix+shift+s` shows or hides the Sidecar, and `prefix+shift+o` switches tabs.
-Click a tab name to switch tabs, or click a pane to return focus to it. While
-the Sidecar has focus, the prefix key still reaches Herdr.
-
-To send text to the Sidecar, select it in any pane. Then right-click the pane
-and choose `Send to Sidecar Notes` or `Send to Sidecar Chat`, or press
-`prefix+shift+y` to send it to the tab in use. When the editor is not running,
-the text is appended to the notes file. A Chat agent that is still starting
-receives the text once it is ready for input. Scripts can do the same through
-the `sidecar.send` socket method.
-
 ## Worktrees
 
 Set the root directory Herdr uses for Git worktree checkouts created from the sidebar:

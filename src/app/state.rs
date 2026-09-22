@@ -876,9 +876,6 @@ pub struct AppState {
     pub(crate) plugin_panes: std::collections::HashMap<PaneId, PluginPaneRecord>,
     /// Session-modal terminal popup. This is intentionally outside workspace layouts.
     pub(crate) popup_pane: Option<PopupPaneState>,
-    /// Sidecar Notes/Chat terminals, also outside workspace layouts.
-    pub(crate) sidecar: crate::app::sidecar::SidecarState,
-    pub(crate) sidecar_config: crate::config::SidecarConfig,
     /// Recent plugin action/event command executions.
     pub(crate) plugin_command_logs: Vec<crate::api::schema::PluginCommandLogInfo>,
     pub(crate) next_plugin_command_log_id: u64,
@@ -1102,8 +1099,6 @@ impl AppState {
             installed_plugins: std::collections::HashMap::new(),
             plugin_panes: std::collections::HashMap::new(),
             popup_pane: None,
-            sidecar: crate::app::sidecar::SidecarState::default(),
-            sidecar_config: crate::config::SidecarConfig::default(),
             plugin_command_logs: Vec::new(),
             next_plugin_command_log_id: 1,
             plugin_commands_in_flight: 0,
@@ -1276,19 +1271,6 @@ impl AppState {
                 &notification.workspace_id,
                 notification.pane_id,
                 "pending agent notification",
-            );
-        }
-        for (_, slot) in self.sidecar.slots() {
-            assert!(
-                self.terminals.contains_key(&slot.terminal_id),
-                "sidecar {:?} references missing terminal {}",
-                slot.pane_id,
-                slot.terminal_id
-            );
-            assert!(
-                !attached_terminal_ids.contains(&slot.terminal_id),
-                "sidecar terminal {} must not be attached to a tiled pane",
-                slot.terminal_id
             );
         }
         if let Some(popup) = &self.popup_pane {
