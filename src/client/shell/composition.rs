@@ -330,6 +330,27 @@ impl ClientShellState {
         });
         blit_pane_surface(&mut frame, &surface.frame, layout.pane_surface);
         restore_mode_bar(&mut frame, mode_bar, mode_bar_cells.as_deref());
+        self.hits.pane_close_buttons =
+            pane_close_buttons(self.snapshot.as_deref(), &self.hits.panes);
+        if !self.hits.pane_close_buttons.is_empty() {
+            let focused_pane_id = self
+                .snapshot
+                .as_deref()
+                .and_then(|snapshot| snapshot.focused_pane_id.as_deref());
+            let cursor = frame.cursor.clone();
+            let mut composed = frame.to_ratatui_buffer()?;
+            for (rect, pane_id) in &self.hits.pane_close_buttons {
+                let color = if focused_pane_id == Some(pane_id.as_str()) {
+                    self.config.palette.accent
+                } else {
+                    self.config.palette.overlay0
+                };
+                if let Some(cell) = composed.cell_mut((rect.x, rect.y)) {
+                    cell.set_symbol("✕").set_fg(color);
+                }
+            }
+            frame.replace_from_ratatui_buffer_preserving_effects(&composed, cursor);
+        }
         let mut occlusion = crate::kitty_graphics::surface::Occlusion::default();
         let has_selection = self
             .selection
@@ -797,4 +818,32 @@ fn client_popup_size(size: crate::protocol::ClientShellPopupSize) -> crate::popu
             crate::popup_size::PopupSize::Percent(percent)
         }
     }
+}
+
+/// A pane that takes right-clicks itself cannot open Herdr's pane menu, so it
+/// gets a close button one cell left of its top-right corner instead. Panes
+/// without a top border are skipped: their top row is terminal content.
+fn pane_close_buttons(
+    snapshot: Option<&ClientShellSnapshot>,
+    panes: &[PaneHit],
+) -> Vec<(Rect, String)> {
+    let Some(snapshot) = snapshot else {
+        return Vec::new();
+    };
+    panes
+        .iter()
+        .filter(|hit| !hit.popup && hit.inner_rect.y > hit.rect.y && hit.rect.width >= 6)
+        .filter(|hit| {
+            snapshot
+                .panes
+                .iter()
+                .any(|pane| pane.pane_id == hit.pane_id && pane.right_click_passthrough)
+        })
+        .map(|hit| {
+            (
+                Rect::new(hit.rect.right().saturating_sub(2), hit.rect.y, 1, 1),
+                hit.pane_id.clone(),
+            )
+        })
+        .collect()
 }

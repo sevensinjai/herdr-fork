@@ -33,6 +33,7 @@ const CLIENT_SHELL_METHODS: &[&str] = &[
     "pane.resize",
     "pane.scroll",
     "pane.selection.read",
+    "pane.send_text",
     "pane.split",
     "pane.swap",
     "pane.zoom",
@@ -301,6 +302,10 @@ mod tests {
         assert_eq!(
             actual.remove("pane.report_metadata").as_deref(),
             Some("c288588cf8ee53e966fa3f060d3b03b7be2654852060d574107e93702e4ba7e7")
+        );
+        assert_eq!(
+            actual.remove("pane.send_text").as_deref(),
+            Some("c9a75f3d4510e4bcc288e832458a60ff67ce7d82a18dda83bdc8f565f2bd32c9")
         );
 
         assert_eq!(

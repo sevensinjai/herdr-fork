@@ -4,6 +4,9 @@ use super::*;
 const AGENT_GROUP_SOURCE: &str = "herdr-ui";
 
 /// Set (`Some`) or clear (`None`) one pane's group token.
+/// Command typed into the pane that "Open new chat in right pane" creates.
+const NEW_CHAT_COMMAND: &str = "claude";
+
 pub(super) fn agent_group_method(
     pane_id: String,
     token: String,
@@ -90,6 +93,7 @@ impl ClientContextMenuOverlay {
                 }
                 items.extend([
                     item("Split right", Action::SplitRight),
+                    item("Open new chat in right pane", Action::NewChatRight),
                     item("Split down", Action::SplitDown),
                     item("Zoom", Action::Zoom),
                     item(
@@ -577,6 +581,34 @@ impl ClientShellState {
                         right_click: Default::default(),
                         env: Default::default(),
                     }),
+                    outcome,
+                );
+            }
+            ClientContextMenuAction::NewChatRight => {
+                // Check before splitting so an older server does not leave a bare shell behind.
+                if !self.supports_endpoint_method_name("pane.send_text") {
+                    outcome.repaint |= self.push_endpoint_notice(
+                        super::state::ClientEndpointNoticeKind::Unsupported,
+                        "pane.send_text",
+                        "Action unavailable",
+                        "This server cannot start a chat in a new pane. Update and restart it to enable this action.",
+                    );
+                    return;
+                }
+                self.push_endpoint_method_with_kind(
+                    Method::PaneSplit(PaneSplitParams {
+                        workspace_id: Some(workspace_id),
+                        target_pane_id: Some(pane_id),
+                        direction: SplitDirection::Right,
+                        ratio: None,
+                        cwd: None,
+                        focus: true,
+                        right_click: Default::default(),
+                        env: Default::default(),
+                    }),
+                    super::state::PendingEndpointKind::SplitThenType {
+                        text: format!("{NEW_CHAT_COMMAND}\r"),
+                    },
                     outcome,
                 );
             }

@@ -93,6 +93,8 @@ pub(super) struct ShellHitMap {
     pub(super) panes: Vec<PaneHit>,
     pub(super) popup: Option<PaneHit>,
     pub(super) pane_splits: Vec<PaneSplitHit>,
+    /// Close buttons on the top border of panes that take right-clicks themselves.
+    pub(super) pane_close_buttons: Vec<(Rect, String)>,
     pub(super) agents: Vec<(Rect, String)>,
     pub(super) endpoint_agents: Vec<(Rect, ClientEndpointId, String)>,
     pub(super) agent_body: Rect,
@@ -525,6 +527,7 @@ pub(super) enum ClientContextMenuAction {
     ClearPaneName,
     SwapWithFocusedPane,
     SplitRight,
+    NewChatRight,
     SplitDown,
     Zoom,
     ToggleRightClickPassthrough,
@@ -655,6 +658,10 @@ pub(super) enum PendingEndpointKind {
         forced: bool,
     },
     SelectionCopy,
+    /// Types `text` into the pane a successful `pane.split` created.
+    SplitThenType {
+        text: String,
+    },
     PaneScroll {
         pane_id: String,
         serial: u64,

@@ -2142,6 +2142,22 @@ impl ClientShellState {
                     );
                     return;
                 }
+                // Before split hits: a lower pane's top border is also a split divider.
+                let close_pane_id = self
+                    .hits
+                    .pane_close_buttons
+                    .iter()
+                    .find(|(rect, _)| super::contains(*rect, point))
+                    .map(|(_, pane_id)| pane_id.clone());
+                if let Some(pane_id) = close_pane_id {
+                    self.push_endpoint_method(
+                        crate::api::schema::Method::PaneClose(crate::api::schema::PaneTarget {
+                            pane_id,
+                        }),
+                        outcome,
+                    );
+                    return;
+                }
                 let scrollbar_hit = self
                     .hits
                     .panes

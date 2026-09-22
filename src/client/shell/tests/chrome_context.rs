@@ -294,6 +294,89 @@ fn client_owned_sidebar_dividers_resize_live() {
     assert!(!split.resize);
 }
 
+fn click_pane_menu_item(
+    state: &mut ClientShellState,
+    action: ClientContextMenuAction,
+) -> ClientShellInput {
+    state.compose(106, 20).expect("composed frame");
+    let pane = state.hits.panes[0].rect;
+    state.handle_raw_events(vec![RawInputEvent::Mouse(crossterm::event::MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Right),
+        column: pane.x + 1,
+        row: pane.y,
+        modifiers: KeyModifiers::empty(),
+    })]);
+    state.compose(106, 20).expect("pane context menu");
+    let index = match state.overlay.as_ref() {
+        Some(ClientShellOverlay::ContextMenu(menu)) => menu
+            .items()
+            .iter()
+            .position(|item| item.action == action)
+            .expect("menu item"),
+        _ => panic!("pane context menu"),
+    };
+    let row = state.hits.context_menu_rows[index].0;
+    state.handle_raw_events(vec![RawInputEvent::Mouse(crossterm::event::MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: row.x + 1,
+        row: row.y,
+        modifiers: KeyModifiers::empty(),
+    })])
+}
+
+#[test]
+fn new_chat_menu_item_splits_right_then_types_the_chat_command() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+
+    let outcome = click_pane_menu_item(&mut state, ClientContextMenuAction::NewChatRight);
+    let [ClientShellAction::Endpoint { request, .. }] = &outcome.actions[..] else {
+        panic!("new chat should split through the endpoint API");
+    };
+    assert!(matches!(
+        &request.method,
+        crate::api::schema::Method::PaneSplit(params)
+            if params.target_pane_id.as_deref() == Some("pane_1")
+                && params.direction == crate::api::schema::SplitDirection::Right
+                && params.focus
+    ));
+
+    let mut created = pane_scroll_result(0, 0, 0);
+    if let crate::api::schema::ResponseResult::PaneInfo { pane } = &mut created {
+        pane.pane_id = "pane_2".into();
+    }
+    let (_, actions) = state.handle_endpoint_result("boot-1", &request.id, Ok(created));
+    let [ClientShellAction::Endpoint { request, .. }] = &actions[..] else {
+        panic!("the new pane should receive the chat command");
+    };
+    assert!(matches!(
+        &request.method,
+        crate::api::schema::Method::PaneSendText(params)
+            if params.pane_id == "pane_2" && params.text == "claude\r"
+    ));
+}
+
+#[test]
+fn new_chat_menu_item_does_not_split_when_the_server_cannot_type_into_panes() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+    for endpoint in &mut state.endpoints {
+        endpoint.methods = Some(
+            crate::server::client_commands::supported_client_shell_method_names()
+                .iter()
+                .filter(|method| **method != "pane.send_text")
+                .map(|method| (*method).to_owned())
+                .collect(),
+        );
+    }
+
+    let outcome = click_pane_menu_item(&mut state, ClientContextMenuAction::NewChatRight);
+    assert!(outcome.actions.is_empty());
+    assert!(state.visible_endpoint_notice.is_some());
+}
+
 #[test]
 fn context_menus_capture_stable_targets_and_route_actions() {
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
@@ -766,4 +849,76 @@ fn new_stage_is_saved_to_group_values_and_reloaded() {
     assert_eq!(std::fs::read_to_string(&path).expect("config"), before);
 
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+fn bordered_surface() -> PaneSurfaceFrame {
+    let mut surface = surface();
+    surface.frame = FrameData::from_ratatui_buffer_with_hyperlinks(
+        &Buffer::with_lines(["┌────────┐", "│LIVE    │", "│PANE    │", "└────────┘"]),
+        None,
+        &[],
+    );
+    surface.panes[0].rect = SurfaceRect {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 4,
+    };
+    surface.panes[0].inner_rect = SurfaceRect {
+        x: 1,
+        y: 1,
+        width: 8,
+        height: 2,
+    };
+    surface
+}
+
+#[test]
+fn panes_that_own_right_clicks_get_a_close_button_on_their_top_border() {
+    let mut snapshot = snapshot();
+    snapshot.panes[0].right_click_passthrough = true;
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot));
+    state.set_pane_surface(bordered_surface());
+    let frame = state.compose(106, 20).expect("composed frame");
+
+    let pane = state.hits.panes[0].rect;
+    let [(button, pane_id)] = &state.hits.pane_close_buttons[..] else {
+        panic!("one close button");
+    };
+    assert_eq!(pane_id, "pane_1");
+    assert_eq!((button.x, button.y), (pane.right() - 2, pane.y));
+    let (x, y) = cell_symbol_position(&frame, pane, "✕");
+    assert_eq!((x, y), (button.x, button.y));
+
+    let outcome =
+        state.handle_raw_events(vec![RawInputEvent::Mouse(crossterm::event::MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: button.x,
+            row: button.y,
+            modifiers: KeyModifiers::empty(),
+        })]);
+    let [ClientShellAction::Endpoint { request, .. }] = &outcome.actions[..] else {
+        panic!("close button should use endpoint API");
+    };
+    assert!(matches!(
+        &request.method,
+        crate::api::schema::Method::PaneClose(target) if target.pane_id == "pane_1"
+    ));
+}
+
+#[test]
+fn panes_with_the_herdr_menu_or_no_top_border_get_no_close_button() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(bordered_surface());
+    state.compose(106, 20).expect("composed frame");
+    assert!(state.hits.pane_close_buttons.is_empty());
+
+    let mut snapshot = snapshot();
+    snapshot.panes[0].right_click_passthrough = true;
+    state.set_snapshot(Box::new(snapshot));
+    state.set_pane_surface(surface());
+    state.compose(106, 20).expect("composed frame");
+    assert!(state.hits.pane_close_buttons.is_empty());
 }

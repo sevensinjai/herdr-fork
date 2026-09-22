@@ -627,6 +627,22 @@ impl ClientShellState {
                 let repaint = self.complete_pane_scroll(pane_id, serial, result, &mut outcome);
                 return (repaint, outcome.actions);
             }
+            PendingEndpointKind::SplitThenType { text } => {
+                let Ok(crate::api::schema::ResponseResult::PaneInfo { pane }) = result else {
+                    return (true, Vec::new());
+                };
+                let mut outcome = ClientShellInput::default();
+                self.push_endpoint_method(
+                    crate::api::schema::Method::PaneSendText(
+                        crate::api::schema::PaneSendTextParams {
+                            pane_id: pane.pane_id,
+                            text,
+                        },
+                    ),
+                    &mut outcome,
+                );
+                return (true, outcome.actions);
+            }
             PendingEndpointKind::SelectionCopy => {
                 return match result {
                     Ok(crate::api::schema::ResponseResult::PaneSelection { text, .. })
