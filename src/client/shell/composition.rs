@@ -654,6 +654,7 @@ impl ClientShellState {
                     self.hits.global_launcher,
                     menu,
                     snapshot,
+                    self.sidecar_menu_state(),
                     &self.config.palette,
                 )?;
                 occlusion.cover(rendered.area);

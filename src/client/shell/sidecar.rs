@@ -37,6 +37,12 @@ impl ClientShellState {
         self.sidecar_surface = None;
     }
 
+    /// Launcher menu entry: hidden when unsupported or in the mobile layout
+    /// (which has no room for the panel), else whether it is open.
+    pub(super) fn sidecar_menu_state(&self) -> Option<bool> {
+        (self.sidecar_supported() && !self.mobile_layout_active()).then_some(self.sidecar.is_some())
+    }
+
     pub(super) fn sidecar_supported(&self) -> bool {
         self.endpoints
             .iter()
@@ -140,6 +146,15 @@ impl ClientShellState {
             }
             return false;
         }
+        if mouse.kind == MouseEventKind::Down(MouseButton::Left)
+            && self
+                .hits
+                .sidecar_close
+                .is_some_and(|close| super::contains(close, point))
+        {
+            self.toggle_sidecar(outcome);
+            return true;
+        }
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
             if let Some(tab) = self
                 .hits
@@ -198,6 +213,7 @@ pub(super) fn compose_sidecar(
     hits.sidecar_panel = None;
     hits.sidecar_body = None;
     hits.sidecar_tabs.clear();
+    hits.sidecar_close = None;
     let Some(ui) = ui else {
         let closed = SidecarViewControl {
             open: false,
@@ -259,6 +275,16 @@ pub(super) fn compose_sidecar(
         hits.sidecar_tabs
             .push((Rect::new(x, header_y, width, 1), tab));
         x += width + 1;
+    }
+    let close = Rect::new(geometry.outer.right().saturating_sub(2), header_y, 1, 1);
+    if close.x > x {
+        composed.set_string(
+            close.x,
+            close.y,
+            "✕",
+            ratatui::style::Style::default().fg(palette.text),
+        );
+        hits.sidecar_close = Some(close);
     }
     let shown = surface.filter(|surface| surface.tab == ui.tab);
     if shown.is_none() {

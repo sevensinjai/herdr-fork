@@ -19,8 +19,11 @@ pub(super) fn global_menu_item_has_badge(
             && snapshot.integration_updates_available)
 }
 
+/// `sidecar`: `None` hides the Sidecar item (unsupported or mobile layout);
+/// otherwise whether the Sidecar is open.
 pub(super) fn global_menu_items(
     snapshot: &ClientShellSnapshot,
+    sidecar: Option<bool>,
 ) -> Vec<(&'static str, ClientGlobalMenuAction)> {
     let mut items = vec![
         (
@@ -31,11 +34,21 @@ pub(super) fn global_menu_items(
             "keybinds",
             ClientGlobalMenuAction::Binding(crate::input::KeybindAction::Help),
         ),
-        (
-            "reload config",
-            ClientGlobalMenuAction::Binding(crate::input::KeybindAction::ReloadConfig),
-        ),
     ];
+    if let Some(open) = sidecar {
+        items.push((
+            if open {
+                "close sidecar"
+            } else {
+                "open sidecar"
+            },
+            ClientGlobalMenuAction::Binding(crate::input::KeybindAction::SidecarToggle),
+        ));
+    }
+    items.extend([(
+        "reload config",
+        ClientGlobalMenuAction::Binding(crate::input::KeybindAction::ReloadConfig),
+    )]);
     if snapshot.update_available.is_some() || snapshot.latest_release_notes_available {
         items.push((
             if snapshot.update_available.is_some() {
@@ -65,10 +78,11 @@ impl ClientShellState {
     }
 
     pub(super) fn move_global_menu_selection(&mut self, delta: isize) {
+        let sidecar = self.sidecar_menu_state();
         let item_count = self
             .snapshot
             .as_deref()
-            .map(global_menu_items)
+            .map(|snapshot| global_menu_items(snapshot, sidecar))
             .map_or(0, |items| items.len());
         let Some(ClientShellOverlay::GlobalMenu(menu)) = self.overlay.as_mut() else {
             return;
@@ -82,8 +96,9 @@ impl ClientShellState {
         index: usize,
         outcome: &mut ClientShellInput,
     ) {
+        let sidecar = self.sidecar_menu_state();
         let Some(action) = self.snapshot.as_deref().and_then(|snapshot| {
-            global_menu_items(snapshot)
+            global_menu_items(snapshot, sidecar)
                 .get(index)
                 .map(|(_, action)| *action)
         }) else {

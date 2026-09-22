@@ -358,3 +358,62 @@ fn open_sidecar_forces_pane_patches_through_a_full_recompose() {
         "pane rows must not be written over the sidecar"
     );
 }
+
+fn global_menu_labels(state: &ClientShellState) -> Vec<&'static str> {
+    super::super::global_menu::global_menu_items(
+        state.snapshot.as_deref().expect("snapshot"),
+        state.sidecar_menu_state(),
+    )
+    .into_iter()
+    .map(|(label, _)| label)
+    .collect()
+}
+
+#[test]
+fn launcher_menu_opens_and_closes_the_sidecar() {
+    let unsupported = sidecar_state(false);
+    assert!(!global_menu_labels(&unsupported)
+        .iter()
+        .any(|label| label.contains("sidecar")));
+
+    let mut state = sidecar_state(true);
+    let labels = global_menu_labels(&state);
+    let open_index = labels
+        .iter()
+        .position(|label| *label == "open sidecar")
+        .expect("open item");
+    state.toggle_global_menu();
+    let mut outcome = ClientShellInput::default();
+    state.activate_global_menu_item(open_index, &mut outcome);
+    assert!(state.sidecar.is_some());
+    assert_eq!(shown_tabs(&outcome), vec![SidecarTab::Notes]);
+
+    let labels = global_menu_labels(&state);
+    let close_index = labels
+        .iter()
+        .position(|label| *label == "close sidecar")
+        .expect("close item");
+    state.toggle_global_menu();
+    state.activate_global_menu_item(close_index, &mut ClientShellInput::default());
+    assert!(state.sidecar.is_none());
+}
+
+#[test]
+fn header_close_button_hides_the_sidecar() {
+    let mut state = sidecar_state(true);
+    toggle(&mut state);
+    install_surface(&mut state, SidecarTab::Notes, "notes");
+    let frame = state.compose(120, 30).expect("frame");
+    let close = state.hits.sidecar_close.expect("close button hit");
+    let panel = state.hits.sidecar_panel.expect("panel");
+    assert_eq!(close.y, panel.y);
+    assert!(frame_rows(&frame)[close.y as usize].contains('✕'));
+
+    state.handle_raw_events(vec![RawInputEvent::Mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: close.x,
+        row: close.y,
+        modifiers: KeyModifiers::empty(),
+    })]);
+    assert!(state.sidecar.is_none());
+}

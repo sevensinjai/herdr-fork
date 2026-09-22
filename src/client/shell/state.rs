@@ -97,6 +97,7 @@ pub(super) struct ShellHitMap {
     pub(super) sidecar_panel: Option<Rect>,
     pub(super) sidecar_body: Option<PaneHit>,
     pub(super) sidecar_tabs: Vec<(Rect, crate::api::schema::SidecarTab)>,
+    pub(super) sidecar_close: Option<Rect>,
     pub(super) pane_splits: Vec<PaneSplitHit>,
     pub(super) agents: Vec<(Rect, String)>,
     pub(super) endpoint_agents: Vec<(Rect, ClientEndpointId, String)>,
