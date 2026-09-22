@@ -529,6 +529,7 @@ pub(super) enum ClientContextMenuAction {
     SplitRight,
     NewChatRight,
     BrowserRight,
+    NoteRight,
     SplitDown,
     Zoom,
     ToggleRightClickPassthrough,

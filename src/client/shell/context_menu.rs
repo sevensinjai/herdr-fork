@@ -8,6 +8,8 @@ const AGENT_GROUP_SOURCE: &str = "herdr-ui";
 const NEW_CHAT_COMMAND: &str = "claude";
 /// Command typed into the pane that "Open terminal browser on the right" creates.
 const BROWSER_COMMAND: &str = "exec terminal-browser open --no-merge";
+/// Command typed into the pane that "Open note" creates.
+const NOTE_COMMAND: &str = "exec terminal-browser open https://docs.new/ --no-merge";
 
 pub(super) fn agent_group_method(
     pane_id: String,
@@ -97,6 +99,7 @@ impl ClientContextMenuOverlay {
                     item("Split right", Action::SplitRight),
                     item("Open new chat in right pane", Action::NewChatRight),
                     item("Open terminal browser on the right", Action::BrowserRight),
+                    item("Open note", Action::NoteRight),
                     item("Split down", Action::SplitDown),
                     item("Zoom", Action::Zoom),
                     item(
@@ -600,6 +603,13 @@ impl ClientShellState {
                 pane_id,
                 workspace_id,
                 BROWSER_COMMAND,
+                PaneRightClickTarget::Pane,
+                outcome,
+            ),
+            ClientContextMenuAction::NoteRight => self.split_right_and_run(
+                pane_id,
+                workspace_id,
+                NOTE_COMMAND,
                 PaneRightClickTarget::Pane,
                 outcome,
             ),

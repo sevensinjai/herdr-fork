@@ -391,6 +391,31 @@ fn browser_menu_item_splits_a_right_click_owning_pane_and_starts_the_browser() {
 }
 
 #[test]
+fn note_menu_item_opens_a_new_document_in_the_browser() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+
+    let outcome = click_pane_menu_item(&mut state, ClientContextMenuAction::NoteRight);
+    let [ClientShellAction::Endpoint { request, .. }] = &outcome.actions[..] else {
+        panic!("note should split through the endpoint API");
+    };
+    let mut created = pane_scroll_result(0, 0, 0);
+    if let crate::api::schema::ResponseResult::PaneInfo { pane } = &mut created {
+        pane.pane_id = "pane_2".into();
+    }
+    let (_, actions) = state.handle_endpoint_result("boot-1", &request.id, Ok(created));
+    let [ClientShellAction::Endpoint { request, .. }] = &actions[..] else {
+        panic!("the new pane should receive the note command");
+    };
+    assert!(matches!(
+        &request.method,
+        crate::api::schema::Method::PaneSendText(params)
+            if params.text == "exec terminal-browser open https://docs.new/ --no-merge\r"
+    ));
+}
+
+#[test]
 fn new_chat_menu_item_does_not_split_when_the_server_cannot_type_into_panes() {
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
     state.set_snapshot(Box::new(snapshot()));
