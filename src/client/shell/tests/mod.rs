@@ -251,6 +251,7 @@ mod close_tab;
 mod copy;
 mod endpoint_requests;
 mod endpoints;
+mod frame_snapshots;
 mod graphics;
 #[path = "input.rs"]
 mod input_domain;

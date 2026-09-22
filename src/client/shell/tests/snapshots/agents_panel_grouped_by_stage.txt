@@ -1,0 +1,30 @@
+ spaces                  │   1      +
+                         │LIVE
+ ● client-shell          │PANE
+   main                  │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+                         │
+ new                 menu│
+─────────────────────────│
+ agents           grouped│
+                         │
+ review (2) ─────────────│
+ ● client-shell          │
+   claude                │
+ ● client-shell          │
+   pi                    │
+ waiting QA (1) ─────────│
+ ● client-shell          │
+   codex                 │
+ ungrouped (1) ──────────│
+ ○ client-shell          │
+   opencode              │
+                        «│

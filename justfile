@@ -83,6 +83,20 @@ install-hooks:
 build:
     cargo build --release --locked
 
+# Drive the real TUI in tmux through each scenario (default: all); not part of `check`
+[unix]
+tui-scenarios *names:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo build --quiet --locked
+    names=({{names}})
+    if ((${#names[@]} == 0)); then
+        for f in scripts/tui_scenarios/*.sh; do [[ $f == */lib.sh ]] || names+=("$(basename "$f" .sh)"); done
+    fi
+    failed=0
+    for n in "${names[@]}"; do HTV_NO_BUILD=1 "scripts/tui_scenarios/$n.sh" || failed=1; done
+    exit "$failed"
+
 # Non-gating full-render scaling profile for background workspaces and active panes
 bench-render-scale:
     cargo test --release --locked --bin herdr render_scale_profile -- --ignored --nocapture --test-threads=1

@@ -437,3 +437,12 @@ fn an_exited_tab_says_so_instead_of_starting() {
     assert!(rows.contains("Notes exited"), "{rows}");
     assert!(!rows.contains("starting"));
 }
+
+#[test]
+fn open_sidecar_frame_snapshot() {
+    let mut state = sidecar_state(true);
+    toggle(&mut state);
+    install_surface(&mut state, SidecarTab::Notes, "# notes for this session");
+    let frame = state.compose(120, 30).expect("frame");
+    super::frame_snapshots::assert_frame_snapshot("open_sidecar_notes", &frame);
+}
