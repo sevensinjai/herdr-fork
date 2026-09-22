@@ -358,6 +358,39 @@ fn new_chat_menu_item_splits_right_then_types_the_chat_command() {
 }
 
 #[test]
+fn browser_menu_item_splits_a_right_click_owning_pane_and_starts_the_browser() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+
+    let outcome = click_pane_menu_item(&mut state, ClientContextMenuAction::BrowserRight);
+    let [ClientShellAction::Endpoint { request, .. }] = &outcome.actions[..] else {
+        panic!("browser should split through the endpoint API");
+    };
+    assert!(matches!(
+        &request.method,
+        crate::api::schema::Method::PaneSplit(params)
+            if params.direction == crate::api::schema::SplitDirection::Right
+                && params.right_click == crate::api::schema::PaneRightClickTarget::Pane
+    ));
+
+    let mut created = pane_scroll_result(0, 0, 0);
+    if let crate::api::schema::ResponseResult::PaneInfo { pane } = &mut created {
+        pane.pane_id = "pane_2".into();
+    }
+    let (_, actions) = state.handle_endpoint_result("boot-1", &request.id, Ok(created));
+    let [ClientShellAction::Endpoint { request, .. }] = &actions[..] else {
+        panic!("the new pane should receive the browser command");
+    };
+    assert!(matches!(
+        &request.method,
+        crate::api::schema::Method::PaneSendText(params)
+            if params.pane_id == "pane_2"
+                && params.text == "exec terminal-browser open --no-merge\r"
+    ));
+}
+
+#[test]
 fn new_chat_menu_item_does_not_split_when_the_server_cannot_type_into_panes() {
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
     state.set_snapshot(Box::new(snapshot()));

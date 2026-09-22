@@ -6,6 +6,8 @@ const AGENT_GROUP_SOURCE: &str = "herdr-ui";
 /// Set (`Some`) or clear (`None`) one pane's group token.
 /// Command typed into the pane that "Open new chat in right pane" creates.
 const NEW_CHAT_COMMAND: &str = "claude";
+/// Command typed into the pane that "Open terminal browser on the right" creates.
+const BROWSER_COMMAND: &str = "exec terminal-browser open --no-merge";
 
 pub(super) fn agent_group_method(
     pane_id: String,
@@ -94,6 +96,7 @@ impl ClientContextMenuOverlay {
                 items.extend([
                     item("Split right", Action::SplitRight),
                     item("Open new chat in right pane", Action::NewChatRight),
+                    item("Open terminal browser on the right", Action::BrowserRight),
                     item("Split down", Action::SplitDown),
                     item("Zoom", Action::Zoom),
                     item(
@@ -584,34 +587,22 @@ impl ClientShellState {
                     outcome,
                 );
             }
-            ClientContextMenuAction::NewChatRight => {
-                // Check before splitting so an older server does not leave a bare shell behind.
-                if !self.supports_endpoint_method_name("pane.send_text") {
-                    outcome.repaint |= self.push_endpoint_notice(
-                        super::state::ClientEndpointNoticeKind::Unsupported,
-                        "pane.send_text",
-                        "Action unavailable",
-                        "This server cannot start a chat in a new pane. Update and restart it to enable this action.",
-                    );
-                    return;
-                }
-                self.push_endpoint_method_with_kind(
-                    Method::PaneSplit(PaneSplitParams {
-                        workspace_id: Some(workspace_id),
-                        target_pane_id: Some(pane_id),
-                        direction: SplitDirection::Right,
-                        ratio: None,
-                        cwd: None,
-                        focus: true,
-                        right_click: Default::default(),
-                        env: Default::default(),
-                    }),
-                    super::state::PendingEndpointKind::SplitThenType {
-                        text: format!("{NEW_CHAT_COMMAND}\r"),
-                    },
-                    outcome,
-                );
-            }
+            ClientContextMenuAction::NewChatRight => self.split_right_and_run(
+                pane_id,
+                workspace_id,
+                NEW_CHAT_COMMAND,
+                PaneRightClickTarget::Herdr,
+                outcome,
+            ),
+            // The browser owns right-clicks like terminal-browser's own splits, so the pane
+            // gets a close button; `exec` closes the pane when the browser quits.
+            ClientContextMenuAction::BrowserRight => self.split_right_and_run(
+                pane_id,
+                workspace_id,
+                BROWSER_COMMAND,
+                PaneRightClickTarget::Pane,
+                outcome,
+            ),
             ClientContextMenuAction::Zoom => self.push_endpoint_method(
                 Method::PaneZoom(PaneZoomParams {
                     pane_id: Some(pane_id),
@@ -635,5 +626,46 @@ impl ClientShellState {
             }
             _ => {}
         }
+    }
+}
+
+impl ClientShellState {
+    /// Splits `pane_id` to the right and types `command` into the new pane.
+    fn split_right_and_run(
+        &mut self,
+        pane_id: String,
+        workspace_id: String,
+        command: &str,
+        right_click: crate::api::schema::PaneRightClickTarget,
+        outcome: &mut ClientShellInput,
+    ) {
+        use crate::api::schema::{Method, PaneSplitParams, SplitDirection};
+
+        // Check before splitting so an older server does not leave a bare shell behind.
+        if !self.supports_endpoint_method_name("pane.send_text") {
+            outcome.repaint |= self.push_endpoint_notice(
+                super::state::ClientEndpointNoticeKind::Unsupported,
+                "pane.send_text",
+                "Action unavailable",
+                "This server cannot start a command in a new pane. Update and restart it to enable this action.",
+            );
+            return;
+        }
+        self.push_endpoint_method_with_kind(
+            Method::PaneSplit(PaneSplitParams {
+                workspace_id: Some(workspace_id),
+                target_pane_id: Some(pane_id),
+                direction: SplitDirection::Right,
+                ratio: None,
+                cwd: None,
+                focus: true,
+                right_click,
+                env: Default::default(),
+            }),
+            super::state::PendingEndpointKind::SplitThenType {
+                text: format!("{command}\r"),
+            },
+            outcome,
+        );
     }
 }
