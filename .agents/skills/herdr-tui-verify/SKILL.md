@@ -39,9 +39,9 @@ session. Safe to run from inside Herdr. Run `--help` for every command.
 H=scripts/tui_harness.sh
 $H up --config my.toml         # appended to a config with onboarding off
 $H cli pane list               # any herdr CLI command, against the harness
-$H prefix S                    # ctrl+b then shift+s
+$H prefix c                    # ctrl+b then c (new tab)
 $H click 60 10 right           # 1-based col,row; SGR mouse
-$H wait-text 'Notes +Chat' 5   # prefer waits to sleeps
+$H wait-text 'review' 5        # prefer waits to sleeps
 $H find 'review \(2\)'         # "row col line"; col is a screen cell (Python regex)
 $H shot 01-open "caption"      # .txt/.ansi/.html under <run>/shots
 $H report "Title"              # all shots in one HTML page
