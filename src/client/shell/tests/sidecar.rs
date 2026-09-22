@@ -304,3 +304,57 @@ fn send_selection_key_targets_notes_until_another_tab_is_used() {
             )
     )));
 }
+
+fn one_row_patch(state: &ClientShellState) -> crate::protocol::PaneSurfacePatch {
+    let mut updated_pane = state.pane_surface.as_ref().expect("surface").panes[0].clone();
+    updated_pane.content_revision += 1;
+    crate::protocol::PaneSurfacePatch {
+        boot_id: "boot-1".into(),
+        projection_revision: 1,
+        base_surface_revision: 1,
+        surface_revision: 2,
+        rows: vec![crate::protocol::PaneSurfacePatchRow {
+            x: 0,
+            y: 0,
+            cells: vec![
+                crate::protocol::CellData {
+                    symbol: "N".into(),
+                    fg: 0,
+                    bg: 0,
+                    modifier: 0,
+                    skip: false,
+                    hyperlink: None,
+                };
+                4
+            ],
+        }],
+        panes: vec![updated_pane],
+        cursor: None,
+    }
+}
+
+#[test]
+fn open_sidecar_forces_pane_patches_through_a_full_recompose() {
+    let mut state = sidecar_state(true);
+    let patch = one_row_patch(&state);
+    assert!(
+        matches!(
+            state.apply_pane_surface_patch(patch),
+            ClientPaneSurfacePatchOutcome::Applied(Some(_))
+        ),
+        "hidden sidecar keeps the fast path"
+    );
+
+    let mut state = sidecar_state(true);
+    toggle(&mut state);
+    install_surface(&mut state, SidecarTab::Notes, "notes");
+    state.compose(120, 30).expect("frame");
+    let patch = one_row_patch(&state);
+    assert!(
+        matches!(
+            state.apply_pane_surface_patch(patch),
+            ClientPaneSurfacePatchOutcome::Applied(None)
+        ),
+        "pane rows must not be written over the sidecar"
+    );
+}
