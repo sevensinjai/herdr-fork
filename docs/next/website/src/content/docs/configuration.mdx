@@ -98,15 +98,17 @@ new_cwd = "follow"
 The Sidecar is a panel that slides in from the right edge over your panes. It
 holds two terminals that keep running while it is hidden:
 
-- **Notes** opens your editor on a notes file for the current session,
-  `~/.config/herdr/sidecar/<session>.md`. Each named session (`herdr --session
-  work`) has its own file, and `herdr session delete` leaves it in place.
+- **Notes** opens `nano` on a notes file for the current session, so you can
+  type right away. Save with `ctrl+o`. Without `nano`, it uses `$EDITOR`, then
+  `vi`. The file is `~/.config/herdr/sidecar/<session>.md`. Each named session
+  (`herdr --session work`) has its own file, and `herdr session delete` leaves
+  it in place.
 - **Chat** runs a scratch agent, `claude` by default.
 
 ```toml
 [sidecar]
 width = "35%"
-notes_command = '${EDITOR:-vi} "$HERDR_SIDECAR_NOTES"'
+notes_command = 'command -v nano >/dev/null && exec nano "$HERDR_SIDECAR_NOTES"; exec ${EDITOR:-vi} "$HERDR_SIDECAR_NOTES"'
 chat_command = "claude"
 ```
 

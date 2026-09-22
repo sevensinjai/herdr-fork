@@ -4,6 +4,7 @@
 
 use super::*;
 
+use crate::api::schema::SidecarTab;
 use crate::protocol::endpoint::{SidecarSurfaceControl, SidecarViewControl};
 
 impl HeadlessServer {
@@ -24,6 +25,42 @@ impl HeadlessServer {
         let cell = client.cell_size;
         fit_sidecar_to_view(&self.app, view, cell);
         true
+    }
+
+    /// Streams the Sidecar to clients showing it when its terminal produced
+    /// output. Output-only renders skip the full render that otherwise carries
+    /// the Sidecar, because its terminal is not part of any tab surface.
+    pub(super) fn stream_sidecar_output(&mut self, pty_sources: &HashSet<crate::layout::PaneId>) {
+        let changed: Vec<SidecarTab> = self
+            .app
+            .state
+            .sidecar
+            .slots()
+            .filter(|(_, slot)| pty_sources.contains(&slot.pane_id))
+            .map(|(tab, _)| tab)
+            .collect();
+        if changed.is_empty() {
+            return;
+        }
+        let client_ids: Vec<u64> = self
+            .clients
+            .iter()
+            .filter(|(_, client)| {
+                client.is_active_shell_client()
+                    && client
+                        .shell_sidecar_view
+                        .is_some_and(|view| view.open && changed.contains(&view.tab))
+            })
+            .map(|(&client_id, _)| client_id)
+            .collect();
+        for client_id in client_ids {
+            if self.stream_client_sidecar(client_id).is_err() {
+                debug!(
+                    client_id,
+                    "sidecar output stream failed; next render handles the client"
+                );
+            }
+        }
     }
 
     /// Sends this client its Sidecar surface when it differs from the last one

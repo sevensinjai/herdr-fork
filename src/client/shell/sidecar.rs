@@ -17,17 +17,22 @@ pub(crate) struct SidecarUi {
 
 impl ClientShellState {
     /// Stores the active endpoint's Sidecar surface. Surfaces from other
-    /// endpoints and for a tab no longer shown are dropped.
+    /// endpoints and for a tab no longer shown are dropped. Returns whether the
+    /// shown panel changed and needs a repaint: the server sends Sidecar
+    /// output on its own, without a pane frame that would repaint anyway.
     pub(crate) fn set_sidecar_surface(
         &mut self,
         endpoint_id: &ClientEndpointId,
         surface: SidecarSurfaceControl,
-    ) {
+    ) -> bool {
         if endpoint_id != &self.active_endpoint_id {
-            return;
+            return false;
         }
         let shown_tab = self.sidecar.map(|sidecar| sidecar.tab);
-        self.sidecar_surface = (shown_tab == Some(surface.tab)).then_some(surface);
+        let next = (shown_tab == Some(surface.tab)).then_some(surface);
+        let repaint = next.is_some() && next != self.sidecar_surface;
+        self.sidecar_surface = next;
+        repaint
     }
 
     /// The server can no longer host the Sidecar (older server or reconnect).
@@ -57,19 +62,18 @@ impl ClientShellState {
             outcome.repaint = true;
             return;
         }
-        if !self.sidecar_supported() {
+        if !self.sidecar_supported() || !self.request_sidecar_show(self.sidecar_tab, outcome) {
             return;
         }
         self.sidecar = Some(SidecarUi {
             tab: self.sidecar_tab,
             focused: true,
         });
-        self.request_sidecar_show(self.sidecar_tab, outcome);
     }
 
     /// Shows `tab`, opening and focusing the Sidecar if it was hidden.
     pub(super) fn show_sidecar_tab(&mut self, tab: SidecarTab, outcome: &mut ClientShellInput) {
-        if !self.sidecar_supported() {
+        if !self.sidecar_supported() || !self.request_sidecar_show(tab, outcome) {
             return;
         }
         let focused = self.sidecar.is_none_or(|ui| ui.focused);
@@ -78,17 +82,24 @@ impl ClientShellState {
         }
         self.sidecar_tab = tab;
         self.sidecar = Some(SidecarUi { tab, focused });
-        self.request_sidecar_show(tab, outcome);
     }
 
-    fn request_sidecar_show(&mut self, tab: SidecarTab, outcome: &mut ClientShellInput) {
-        // Force the next compose to report the view even if its size is unchanged.
-        self.sidecar_view_sent = None;
-        self.push_endpoint_method(
+    /// Asks the server to start and show `tab`. Returns false when the request
+    /// was not sent (server not ready yet, or method unsupported); the caller
+    /// must then leave the panel as it was, or it waits on a terminal that
+    /// never starts. The refusal is already shown as a notice.
+    fn request_sidecar_show(&mut self, tab: SidecarTab, outcome: &mut ClientShellInput) -> bool {
+        let sent = self.push_endpoint_method_with_kind(
             crate::api::schema::Method::SidecarShow(crate::api::schema::SidecarShowParams { tab }),
+            PendingEndpointKind::Generic,
             outcome,
         );
-        outcome.repaint = true;
+        if sent {
+            // Force the next compose to report the view even if its size is unchanged.
+            self.sidecar_view_sent = None;
+            outcome.repaint = true;
+        }
+        sent
     }
 
     /// Target for keys, text, and paste while the Sidecar has focus and its

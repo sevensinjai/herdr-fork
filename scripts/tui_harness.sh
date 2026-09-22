@@ -128,7 +128,10 @@ cmd_up() {
   tm set-option -t htv status off >/dev/null
 
   for _ in $(seq 1 100); do
-    if [[ -S "$base/run/api.sock" ]] && herdr_env "$bin" pane list >/dev/null 2>&1; then
+    # The API answers before the client is online; keys sent earlier are
+    # refused. The sidebar only draws once the client has its first snapshot.
+    if [[ -S "$base/run/api.sock" ]] && herdr_env "$bin" pane list >/dev/null 2>&1 \
+      && screen_text | grep -q '^ spaces'; then
       echo "$base"
       return 0
     fi
@@ -187,8 +190,17 @@ cmd_wait() {
 }
 
 cmd_find() {
-  # ENVIRON keeps backslashes intact; `awk -v` would unescape them.
-  screen_text | RE="$1" awk '{ i = match($0, ENVIRON["RE"]); if (i) printf "%d %d %s\n", NR, i, $0 }'
+  # Columns are screen cells, not bytes: box-drawing glyphs are multi-byte,
+  # and wide (CJK) characters take two cells.
+  screen_text | python3 -c '
+import re, sys, unicodedata
+pattern = re.compile(sys.argv[1])
+for row, line in enumerate(sys.stdin.read().splitlines(), 1):
+    match = pattern.search(line)
+    if match:
+        col = 1 + sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in line[: match.start()])
+        print(row, col, line)
+' "$1"
 }
 
 cmd_shot() {

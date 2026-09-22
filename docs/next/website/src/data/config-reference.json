@@ -1487,7 +1487,7 @@
         {
           "key": "sidecar.notes_command",
           "type": "string",
-          "default": "'${EDITOR:-vi} \"$HERDR_SIDECAR_NOTES\"'",
+          "default": "'command -v nano >/dev/null && exec nano \"$HERDR_SIDECAR_NOTES\"; exec ${EDITOR:-vi} \"$HERDR_SIDECAR_NOTES\"'",
           "description": "Shell command for the Notes tab. $HERDR_SIDECAR_NOTES is the per-session notes file, ~/.config/herdr/sidecar/<session>.md."
         },
         {

@@ -2,6 +2,10 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::popup_size::PopupSize;
 
+/// Default Notes editor. `nano` has no modes, so typing goes straight into the
+/// file; systems without it fall back to `$EDITOR`, then `vi`.
+const NOTES_COMMAND: &str = r#"command -v nano >/dev/null && exec nano "$HERDR_SIDECAR_NOTES"; exec ${EDITOR:-vi} "$HERDR_SIDECAR_NOTES""#;
+
 /// `[sidecar]`: the right-docked Notes/Chat panel.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default)]
@@ -20,7 +24,7 @@ impl Default for SidecarConfig {
     fn default() -> Self {
         Self {
             width: PopupSize::Percent(35),
-            notes_command: "${EDITOR:-vi} \"$HERDR_SIDECAR_NOTES\"".to_string(),
+            notes_command: NOTES_COMMAND.to_string(),
             chat_command: "claude".to_string(),
         }
     }
@@ -44,10 +48,7 @@ mod tests {
     fn defaults() {
         let config: crate::config::Config = toml::from_str("").expect("defaults");
         assert_eq!(config.sidecar.width, PopupSize::Percent(35));
-        assert_eq!(
-            config.sidecar.notes_command,
-            "${EDITOR:-vi} \"$HERDR_SIDECAR_NOTES\""
-        );
+        assert_eq!(config.sidecar.notes_command, super::NOTES_COMMAND);
         assert_eq!(config.sidecar.chat_command, "claude");
     }
 

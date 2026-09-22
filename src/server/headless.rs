@@ -608,6 +608,7 @@ impl HeadlessServer {
                     && self.render_retained_pane_surface_and_stream(&render_request.pty_sources)
                 {
                     crate::render_prof::event("retained_surface.invoke");
+                    self.stream_sidecar_output(&render_request.pty_sources);
                 } else {
                     crate::render_prof::event("full_render.invoke");
                     self.render_and_stream();

@@ -1931,8 +1931,15 @@ async fn run_client_loop(
                                 continue;
                             }
                             Ok(endpoint::EndpointControlMessage::SidecarSurface(surface)) => {
-                                if let Some(shell) = state.shell.as_mut() {
-                                    shell.set_sidecar_surface(&endpoint_id, *surface);
+                                let (width, height) = state.reported_size;
+                                let frame = state.shell.as_mut().and_then(|shell| {
+                                    shell
+                                        .set_sidecar_surface(&endpoint_id, *surface)
+                                        .then(|| shell.compose(width, height))
+                                        .flatten()
+                                });
+                                if let Some(frame) = frame {
+                                    state.present_frame(frame);
                                 }
                                 continue;
                             }

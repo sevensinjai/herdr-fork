@@ -446,3 +446,41 @@ fn open_sidecar_frame_snapshot() {
     let frame = state.compose(120, 30).expect("frame");
     super::frame_snapshots::assert_frame_snapshot("open_sidecar_notes", &frame);
 }
+
+#[test]
+fn toggle_before_the_server_is_ready_leaves_the_sidecar_closed() {
+    // No snapshot yet: the endpoint is not online, so `sidecar.show` is refused.
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_endpoint_methods(Some(vec!["sidecar.show".into()]));
+    state.set_endpoint_sidecar_supported(&ClientEndpointId::Local, true);
+    assert!(state.sidecar_supported());
+    let outcome = toggle(&mut state);
+    assert!(shown_tabs(&outcome).is_empty());
+    assert!(
+        state.sidecar.is_none(),
+        "a panel with no terminal would say starting… forever"
+    );
+}
+
+#[test]
+fn a_new_surface_for_the_shown_tab_asks_for_a_repaint() {
+    let mut state = sidecar_state(true);
+    toggle(&mut state);
+    let surface = |text: &str| SidecarSurfaceControl {
+        tab: SidecarTab::Notes,
+        terminal_id: Some("sidecar-terminal".into()),
+        frame: Some(FrameData::from_ratatui_buffer_with_hyperlinks(
+            &Buffer::with_lines([text]),
+            None,
+            &[],
+        )),
+        mouse_reporting: false,
+        exited: false,
+    };
+    assert!(state.set_sidecar_surface(&ClientEndpointId::Local, surface("one")));
+    assert!(!state.set_sidecar_surface(&ClientEndpointId::Local, surface("one")));
+    assert!(state.set_sidecar_surface(&ClientEndpointId::Local, surface("two")));
+    let mut chat = surface("chat");
+    chat.tab = SidecarTab::Chat;
+    assert!(!state.set_sidecar_surface(&ClientEndpointId::Local, chat));
+}
