@@ -391,7 +391,7 @@ fn browser_menu_item_splits_a_right_click_owning_pane_and_starts_the_browser() {
 }
 
 #[test]
-fn note_menu_item_opens_a_new_document_in_the_browser() {
+fn note_menu_item_opens_a_new_note_in_micro() {
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
     state.set_snapshot(Box::new(snapshot()));
     state.set_pane_surface(surface());
@@ -411,7 +411,8 @@ fn note_menu_item_opens_a_new_document_in_the_browser() {
     assert!(matches!(
         &request.method,
         crate::api::schema::Method::PaneSendText(params)
-            if params.text == "exec terminal-browser open https://docs.new/ --no-merge\r"
+            if params.text.starts_with("mkdir -p ~/notes && exec micro -autosave 1 ")
+                && params.text.ends_with(".md\r")
     ));
 }
 

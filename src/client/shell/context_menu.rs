@@ -8,8 +8,9 @@ const AGENT_GROUP_SOURCE: &str = "herdr-ui";
 const NEW_CHAT_COMMAND: &str = "claude";
 /// Command typed into the pane that "Open terminal browser on the right" creates.
 const BROWSER_COMMAND: &str = "exec terminal-browser open --no-merge";
-/// Command typed into the pane that "Open note" creates.
-const NOTE_COMMAND: &str = "exec terminal-browser open https://docs.new/ --no-merge";
+/// Command typed into the pane that "Open note" creates: a new timestamped note
+/// in `~/notes`, in micro (modeless, mouse-aware) with one-second autosave.
+const NOTE_COMMAND: &str = "mkdir -p ~/notes && exec micro -autosave 1 -softwrap true -wordwrap true ~/notes/$(date +%Y-%m-%d-%H%M%S).md";
 
 pub(super) fn agent_group_method(
     pane_id: String,
@@ -610,7 +611,7 @@ impl ClientShellState {
                 pane_id,
                 workspace_id,
                 NOTE_COMMAND,
-                PaneRightClickTarget::Pane,
+                PaneRightClickTarget::Herdr,
                 outcome,
             ),
             ClientContextMenuAction::Zoom => self.push_endpoint_method(
